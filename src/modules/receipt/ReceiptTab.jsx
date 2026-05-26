@@ -3,7 +3,7 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useDispatch, useSelector } from "react-redux";
 import { addMultipleExpenses } from "../../store/budgetSlice";
-import { setAssistantReply } from "../../store/uiSlice";
+import { setAssistantReply, setActiveTab } from "../../store/uiSlice";
 import { categories } from "../../utils/constants";
 import {
   calcRemaining,
@@ -17,8 +17,11 @@ import Card from "../../components/Card";
 import BudgetImpactPanel from "./BudgetImpactPanel";
 import ReceiptItemEditor from "./ReceiptItemEditor";
 import ReceiptUploader from "./ReceiptUploader";
+import TotalVerificationBox from "./TotalVerificationBox";
+import CompletionDialog from "./CompletionDialog";
 import {
   parseReceiptText,
+  parseReceiptTextWithTotal,
   runOcr,
   validateReceiptFile,
 } from "./receiptScanner";
@@ -34,6 +37,11 @@ const initialReceiptState = {
   status: "Receipt image upload koro tahole OCR diye extract hobe.",
   scanning: false,
   progress: 0,
+  extractedTotal: 0,
+  showTotalVerification: false,
+  totalVerified: false,
+  showCompletion: false,
+  completionData: null,
 };
 
 function createManualItem() {
@@ -123,17 +131,22 @@ function ReceiptTab() {
       const result = await runOcr(receipt.file, (progress) =>
         update({ progress }),
       );
-      const items = parseReceiptText(result.rawText, todayLabel);
+      const { items, extractedTotal } = parseReceiptTextWithTotal(
+        result.rawText,
+        todayLabel,
+      );
 
       update({
         rawText: result.rawText,
         wordCount: result.wordCount,
         confidence: result.confidence,
         items,
+        extractedTotal,
         scanning: false,
         progress: 100,
+        showTotalVerification: extractedTotal > 0,
         status: items.length
-          ? `${items.length} ta item extract hoyeche. Review kore add koro.`
+          ? `${items.length} ta item extract hoyeche. Total verify kore confirm koro.`
           : "OCR text pawa geche kintu item parse hoyni. Manual entry use koro.",
       });
     } catch (error) {
@@ -183,17 +196,97 @@ function ReceiptTab() {
 
   function handleAddToBudget() {
     if (!receipt.items.length) return;
+    
     dispatch(addMultipleExpenses(receipt.items));
+    
+    // Calculate category breakdown for completion dialog
+    const categoryBreakdown = {};
+    receipt.items.forEach((item) => {
+      categoryBreakdown[item.category] =
+        (categoryBreakdown[item.category] || 0) + 1;
+    });
+
     dispatch(
       setAssistantReply({
         reply: `Receipt added! ${money(receiptTotal)} khoroch hoyeche.`,
         insight: `Remaining: ${money(Math.max(remaining - receiptTotal, 0))}.`,
       }),
     );
+
+    // Show completion dialog
     update({
+      showCompletion: true,
+      completionData: {
+        totalAmount: receiptTotal,
+        itemCount: receipt.items.length,
+        categories: categoryBreakdown,
+      },
       items: [],
       status: `${receipt.items.length} ta item budget e add hoyeche.`,
+      showTotalVerification: false,
     });
+  }
+
+  function handleVerifyTotal(confirmedTotal) {
+    // Add or update an "OCR Total" line item if needed
+    const itemsSum = receipt.items.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0,
+    );
+    const difference = Math.abs(itemsSum - confirmedTotal);
+
+    // If there's a significant difference, add an adjustment
+    if (difference > 1) {
+      const adjustment = confirmedTotal - itemsSum;
+      update({
+        items: [
+          ...receipt.items,
+          {
+            id: createId("receipt"),
+            amount: adjustment,
+            currency: "BDT",
+            category: "Groceries",
+            subcategory: "Adjustment",
+            merchant: "OCR Receipt",
+            date: todayLabel,
+            note: `OCR verification adjustment × 1`,
+            qty: 1,
+          },
+        ],
+        showTotalVerification: false,
+        totalVerified: true,
+        status: `Receipt total confirmed as ${money(confirmedTotal)}. Items ready to add.`,
+      });
+    } else {
+      update({
+        showTotalVerification: false,
+        totalVerified: true,
+        status: `Receipt total confirmed as ${money(confirmedTotal)}. Items ready to add.`,
+      });
+    }
+  }
+
+  function handleCancelVerification() {
+    update({
+      showTotalVerification: false,
+      totalVerified: false,
+      status: "Total verification cancelled. You can edit items manually.",
+    });
+  }
+
+  function handleCompletionDialogContinue() {
+    update({
+      showCompletion: false,
+      completionData: null,
+      preview: null,
+      file: null,
+      fileName: "",
+      rawText: "",
+      wordCount: 0,
+      confidence: 0,
+      totalVerified: false,
+    });
+    dispatch(setActiveTab("assistant"));
   }
 
   return (
@@ -216,6 +309,7 @@ function ReceiptTab() {
           progress={receipt.progress}
           hasFile={!!receipt.file}
           hasItems={receipt.items.length > 0}
+          totalVerified={receipt.totalVerified}
           onPickImage={handlePickImage}
           onExtract={handleExtract}
           onAddManual={() =>
@@ -230,6 +324,18 @@ function ReceiptTab() {
         <BudgetImpactPanel receiptItems={receipt.items} />
       </Card>
 
+      {receipt.showTotalVerification && receipt.extractedTotal > 0 && (
+        <Card>
+          <TotalVerificationBox
+            extractedTotal={receipt.extractedTotal}
+            itemsSum={receiptTotal}
+            items={receipt.items}
+            onConfirm={handleVerifyTotal}
+            onCancel={handleCancelVerification}
+          />
+        </Card>
+      )}
+
       <Card>
         <ReceiptItemEditor
           items={receipt.items}
@@ -240,10 +346,10 @@ function ReceiptTab() {
           onAddManual={() =>
             update({ items: [...receipt.items, createManualItem()] })
           }
-          onClearAll={() => update({ items: [], status: "Items cleared." })}
+          onClearAll={() => update({ items: [], status: "Items cleared.", totalVerified: false })}
         />
 
-        {receipt.items.length ? (
+        {receipt.items.length && receipt.totalVerified ? (
           <View style={styles.totalRow}>
             <View>
               <Text style={styles.totalLabel}>
@@ -259,6 +365,14 @@ function ReceiptTab() {
           </View>
         ) : null}
       </Card>
+
+      <CompletionDialog
+        visible={receipt.showCompletion}
+        totalAmount={receipt.completionData?.totalAmount}
+        itemCount={receipt.completionData?.itemCount}
+        categories={receipt.completionData?.categories}
+        onContinue={handleCompletionDialogContinue}
+      />
     </View>
   );
 }

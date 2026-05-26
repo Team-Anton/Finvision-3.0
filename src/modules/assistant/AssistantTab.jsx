@@ -87,6 +87,13 @@ function AssistantTab() {
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
+      <View style={styles.heroWrapper}>
+        <img
+          src="/cover-finvision.png"
+          alt="FinVision AI - Smart Finance for Students"
+          style={styles.heroImage}
+        />
+      </View>
       <Card>
         <Text style={styles.sectionTitle}>Ask FinVision</Text>
         <Text style={styles.muted}>
@@ -168,6 +175,19 @@ const styles = StyleSheet.create({
   screen: {
     gap: 16,
     paddingBottom: 24,
+  },
+  heroWrapper: {
+    width: "100%",
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#ffffff",
+  },
+  heroImage: {
+    width: "100%",
+    height: "auto",
+    display: "block",
   },
   sectionTitle: {
     fontSize: 18,

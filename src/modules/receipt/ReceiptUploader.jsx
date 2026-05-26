@@ -13,6 +13,7 @@ function ReceiptUploader({
   progress,
   hasFile,
   hasItems,
+  totalVerified,
   onPickImage,
   onExtract,
   onAddManual,
@@ -68,7 +69,7 @@ function ReceiptUploader({
             Remove image
           </Button>
         ) : null}
-        <Button variant="success" onPress={onAddToBudget} disabled={!hasItems}>
+        <Button variant="success" onPress={onAddToBudget} disabled={!hasItems || !totalVerified}>
           Add to budget
         </Button>
       </View>
