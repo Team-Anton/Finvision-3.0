@@ -1,5 +1,4 @@
 import { detectCategory, parseReceiptNumber } from "../../utils/helpers";
-import { OCR_SPACE_API_KEY, OCR_SPACE_ENDPOINT } from "../../utils/constants";
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -180,7 +179,7 @@ export function parseReceiptText(rawText, todayLabel) {
     items.length &&
     netPayable &&
     Math.abs(sum - netPayable) <= 100 &&
-    Math.abs(sum - netPayable) > 1
+    Math.abs(sum - netPayable) > 0.01
   ) {
     items.push({
       id: createId(),
@@ -212,58 +211,11 @@ export function parseReceiptText(rawText, todayLabel) {
   return items;
 }
 
-export async function runOcr(asset, onProgress) {
-  if (!asset?.base64) {
-    throw new Error("No base64 image data found.");
-  }
-
-  onProgress?.(20);
-
-  const base64Image = asset.base64.startsWith("data:")
-    ? asset.base64
-    : `data:image/jpeg;base64,${asset.base64}`;
-
-  const formData = new FormData();
-  formData.append("base64Image", base64Image);
-  formData.append("language", "eng");
-  formData.append("isOverlayRequired", "false");
-  formData.append("detectOrientation", "true");
-  formData.append("scale", "true");
-  formData.append("OCREngine", "2");
-
-  onProgress?.(50);
-
-  const response = await fetch(OCR_SPACE_ENDPOINT, {
-    method: "POST",
-    headers: { apikey: OCR_SPACE_API_KEY },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(`OCR API error: ${response.status}`);
-  }
-
-  onProgress?.(80);
-
-  const data = await response.json();
-  if (data.IsErroredOnProcessing) {
-    throw new Error(data.ErrorMessage?.[0] || "OCR processing failed.");
-  }
-
-  const rawText = data.ParsedResults?.[0]?.ParsedText || "";
-  const wordCount = rawText.split(/\s+/).filter(Boolean).length;
-
-  onProgress?.(100);
-
-  return { rawText, wordCount, confidence: 85 };
+export async function runOcr() {
+  throw new Error("OCR is not enabled in React Native yet.");
 }
 
 export function validateReceiptFile(asset) {
   if (!asset?.uri) return { valid: false, error: "Kono image select hoyni." };
-  if (!asset.base64)
-    return {
-      valid: false,
-      error: "Image base64 data pawa jachhe na. Please try again.",
-    };
   return { valid: true, error: null };
 }

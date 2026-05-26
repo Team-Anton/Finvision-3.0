@@ -1,443 +1,437 @@
-import React, { useState, useMemo } from 'react';
-import { createSplitExpense, calcShares, validateSplit } from './SplitEngine';
-import { MemberAvatar } from './MemberList';
-import { money } from '../../utils/helpers';
-import Button from '../../components/Button';
-import Card from '../../components/Card';
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Button from "../../components/Button";
+import Card from "../../components/Card";
+import { money } from "../../utils/helpers";
+import { MemberAvatar } from "./MemberList";
+import { calcShares, createSplitExpense, validateSplit } from "./SplitEngine";
 
-// ─── SplitTypeSelector ──────────────────────────────────────────────────
-function SplitTypeSelector({ selected, onChange }) {
-  const types = [
-    { key: 'equal', label: '⚖️ Equal', sub: 'Somaan bhag' },
-    { key: 'custom', label: '✏️ Custom', sub: 'Nijer moto' },
-    { key: 'percentage', label: '📊 Percent', sub: '% hisebe' },
-  ];
-
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {types.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => onChange(t.key)}
-          className={`rounded-2xl p-3 text-center transition border ${
-            selected === t.key
-              ? 'bg-slate-950 text-white border-slate-950'
-              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400'
-          }`}
-        >
-          <p className="text-sm font-black">{t.label}</p>
-          <p
-            className={`text-xs ${
-              selected === t.key ? 'text-slate-300' : 'text-slate-400'
-            }`}
-          >
-            {t.sub}
-          </p>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── MemberSelector ─────────────────────────────────────────────────────
-function MemberSelector({ members, selectedIds, onChange }) {
-  function toggle(id) {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter((sid) => sid !== id));
-    } else {
-      onChange([...selectedIds, id]);
-    }
-  }
-
-  function selectAll() {
-    onChange(members.map((m) => m.id));
-  }
-
-  function clearAll() {
-    onChange([]);
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-slate-500">
-          Ke ke involved? ({selectedIds.length}/{members.length})
-        </p>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={selectAll}
-            className="text-xs text-slate-500 hover:text-slate-700 font-bold"
-          >
-            All
-          </button>
-          <span className="text-xs text-slate-300">|</span>
-          <button
-            onClick={clearAll}
-            className="text-xs text-slate-500 hover:text-slate-700 font-bold"
-          >
-            None
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {members.map((m) => {
-          const isSelected = selectedIds.includes(m.id);
-          return (
-            <button
-              key={m.id}
-              onClick={() => toggle(m.id)}
-              className={`rounded-full px-3 py-1.5 text-sm font-bold border flex items-center gap-1.5 transition ${
-                isSelected
-                  ? `${m.color.bg} ${m.color.text} border-transparent`
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-              }`}
-            >
-              <MemberAvatar member={m} size="sm" />
-              {m.name}
-              {isSelected && ' ✓'}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── PayerSelector ──────────────────────────────────────────────────────
-function PayerSelector({ members, selectedId, onChange }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-bold text-slate-500">Ke pay korsche?</p>
-      <div className="flex flex-wrap gap-2">
-        {members.map((m) => {
-          const isSelected = selectedId === m.id;
-          return (
-            <button
-              key={m.id}
-              onClick={() => onChange(m.id)}
-              className={`rounded-full px-3 py-1.5 text-sm font-bold border flex items-center gap-1.5 transition ${
-                isSelected
-                  ? 'bg-slate-950 text-white border-slate-950'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-              }`}
-            >
-              <MemberAvatar member={m} size="sm" />
-              {m.name}
-              {isSelected && ' 💳'}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── CustomAmountInputs ─────────────────────────────────────────────────
-function CustomAmountInputs({
-  members,
-  selectedIds,
-  customAmounts,
-  onChange,
-  totalAmount,
-  splitType,
+function ExpenseSplitter({
+  members = [],
+  expenses = [],
+  onAdd,
+  onDelete,
+  walletMember,
 }) {
-  const selectedMembers = members.filter((m) => selectedIds.includes(m.id));
-  const currentSum = selectedIds.reduce(
-    (s, id) => s + Number(customAmounts[id] || 0),
-    0
-  );
-  const target = splitType === 'percentage' ? 100 : totalAmount;
-  const diff = Number((target - currentSum).toFixed(2));
-  const isValid = Math.abs(diff) < 0.01;
-
-  return (
-    <div className="space-y-3">
-      {selectedMembers.map((m) => (
-        <div key={m.id} className="flex items-center gap-3">
-          <MemberAvatar member={m} size="sm" />
-          <p className="text-sm font-bold w-20 truncate">{m.name}</p>
-          <div className="relative flex-1">
-            <input
-              type="number"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm pr-12 outline-none focus:border-slate-950"
-              value={customAmounts[m.id] || ''}
-              min={0}
-              onChange={(e) =>
-                onChange({ ...customAmounts, [m.id]: e.target.value })
-              }
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">
-              {splitType === 'percentage' ? '%' : 'BDT'}
-            </span>
-          </div>
-        </div>
-      ))}
-
-      {/* Sum indicator */}
-      <div
-        className={`rounded-xl px-3 py-2 text-xs font-bold flex justify-between ${
-          isValid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-        }`}
-      >
-        <span>
-          Sum:{' '}
-          {splitType === 'percentage'
-            ? `${currentSum.toFixed(1)}%`
-            : money(currentSum)}
-        </span>
-        <span>
-          {isValid
-            ? '✅ Valid'
-            : diff > 0
-            ? `${splitType === 'percentage' ? `${diff.toFixed(1)}%` : money(diff)} baki`
-            : `${splitType === 'percentage' ? `${Math.abs(diff).toFixed(1)}%` : money(Math.abs(diff))} beshi`}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── SharePreview ───────────────────────────────────────────────────────
-function SharePreview({ members, expense }) {
-  if (!expense.memberIds || expense.memberIds.length === 0 || !expense.amount)
-    return null;
-
-  const shares = calcShares(expense);
-  const selectedMembers = members.filter((m) =>
-    expense.memberIds.includes(m.id)
-  );
-
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4 space-y-2">
-      <p className="text-xs font-bold text-slate-500">Share preview</p>
-      {selectedMembers.map((m) => {
-        const share = shares[m.id] || 0;
-        const pct = Math.round(
-          (share / Math.max(expense.amount, 1)) * 100
-        );
-        return (
-          <div key={m.id} className="flex items-center gap-2">
-            <MemberAvatar member={m} size="sm" />
-            <div className="flex-1">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="font-bold">{m.name}</span>
-                <span className="font-black">{money(share)}</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${pct}%`,
-                    backgroundColor: m.color.hex,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── SplitExpenseList ───────────────────────────────────────────────────
-function SplitExpenseList({ expenses, members, onDelete }) {
-  if (!expenses.length) return null;
-
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-bold text-slate-500">
-        {expenses.length} ta expense added
-      </p>
-      {expenses.map((e) => {
-        const payer = members.find((m) => m.id === e.paidById);
-        return (
-          <div
-            key={e.id}
-            className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 hover:bg-slate-100 transition"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {payer && <MemberAvatar member={payer} size="sm" />}
-              <div className="min-w-0">
-                <p className="text-sm font-bold truncate">{e.title}</p>
-                <p className="text-xs text-slate-400">
-                  Paid by {payer?.name || '?'} · {e.memberIds?.length} jon split
-                  · {e.date}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
-              <span className="font-black text-sm">{money(e.amount)}</span>
-              <button
-                onClick={() => onDelete(e.id)}
-                className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 hover:bg-red-100 hover:text-red-500 text-xs font-bold flex items-center justify-center transition"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── ExpenseSplitter (DEFAULT EXPORT) ───────────────────────────────────
-function ExpenseSplitter({ members, expenses, onAdd, onDelete }) {
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [paidById, setPaidById] = useState(members[0]?.id || '');
-  const [memberIds, setMemberIds] = useState(members.map((m) => m.id));
-  const [splitType, setSplitType] = useState('equal');
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [contributors, setContributors] = useState({});
+  const [memberIds, setMemberIds] = useState([]);
+  const [splitType, setSplitType] = useState("equal");
   const [customAmounts, setCustomAmounts] = useState({});
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
+  const selectedIds = memberIds.length ? memberIds : members.map((m) => m.id);
+  const contributorList = walletMember ? [walletMember, ...members] : members;
+  const contributorIds = Object.keys(contributors).filter(
+    (id) => Number(contributors[id] || 0) > 0,
+  );
   const previewExpense = useMemo(
     () => ({
       amount: Number(amount) || 0,
-      memberIds,
+      memberIds: selectedIds,
       splitType,
       customAmounts,
     }),
-    [amount, memberIds, splitType, customAmounts]
+    [amount, selectedIds, splitType, customAmounts],
   );
+  const shares = calcShares(previewExpense);
+
+  function toggleMember(id) {
+    const base = selectedIds;
+    setMemberIds(
+      base.includes(id) ? base.filter((item) => item !== id) : [...base, id],
+    );
+  }
 
   function handleAdd() {
     const expense = createSplitExpense({
       title,
       amount: Number(amount),
-      paidById: paidById || members[0]?.id,
-      memberIds,
+      contributors: contributorIds.map((id) => ({
+        memberId: id,
+        amount: Number(contributors[id] || 0),
+      })),
+      memberIds: selectedIds,
       splitType,
       customAmounts,
     });
-    const { valid, error: err } = validateSplit(expense);
-    if (!valid) {
-      setError(err);
+    const validation = validateSplit(expense);
+    if (!validation.valid) {
+      setError(validation.error);
       return;
     }
     onAdd(expense);
-    setTitle('');
-    setAmount('');
+    setTitle("");
+    setAmount("");
+    setContributors({});
     setCustomAmounts({});
-    setError('');
+    setError("");
   }
 
   if (!members.length) {
     return (
-      <Card className="p-8 text-center">
-        <p className="text-5xl mb-3">➕</p>
-        <p className="font-black text-slate-700">Aghe member add koro</p>
-        <p className="text-sm text-slate-400 mt-1">
-          Member add korle expense split kora jabe.
-        </p>
+      <Card>
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Aghe member add koro</Text>
+          <Text style={styles.emptySubtitle}>
+            Member add korle expense split kora jabe.
+          </Text>
+        </View>
       </Card>
     );
   }
 
   return (
-    <Card padding={false} className="p-6">
-      {/* Header */}
-      <h3 className="text-lg font-black">Add Group Expense</h3>
-      <p className="text-xs text-slate-400">Expense add kore split koro.</p>
+    <Card>
+      <View style={styles.header}>
+        <Text style={styles.title}>Add Group Expense</Text>
+        <Text style={styles.subtitle}>Expense add kore split koro.</Text>
+      </View>
 
-      {/* Form */}
-      <div className="mt-4 space-y-4">
-        {/* Title + Amount */}
-        <div className="grid grid-cols-[1fr_auto] gap-3">
-          <div>
-            <label className="text-xs font-bold text-slate-500">
-              Expense title
-            </label>
-            <input
-              className="mt-1 w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-slate-950"
-              placeholder="e.g. Lunch, Rickshaw, Hotel"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500">
-              Amount (BDT)
-            </label>
-            <input
-              type="number"
-              className="mt-1 w-32 rounded-2xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-slate-950"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-        </div>
-
-        {/* Payer */}
-        <PayerSelector
-          members={members}
-          selectedId={paidById || members[0]?.id}
-          onChange={setPaidById}
+      <View style={styles.form}>
+        <TextInput
+          value={title}
+          onChangeText={setTitle}
+          placeholder="Lunch, Rickshaw, Hotel"
+          style={styles.input}
+        />
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="Amount"
+          style={styles.input}
+          keyboardType="numeric"
         />
 
-        {/* Split type */}
-        <div>
-          <p className="text-xs font-bold text-slate-500 mb-2">Split type</p>
-          <SplitTypeSelector
-            selected={splitType}
-            onChange={(t) => {
-              setSplitType(t);
-              setCustomAmounts({});
+        <Text style={styles.label}>Contributors (multiple)</Text>
+        <View style={styles.contributorList}>
+          {contributorList.map((member) => (
+            <View key={member.id} style={styles.contributorRow}>
+              <View style={styles.contributorInfo}>
+                <MemberAvatar member={member} size="sm" />
+                <Text style={styles.contributorName}>{member.name}</Text>
+              </View>
+              <TextInput
+                value={
+                  contributors[member.id] === undefined
+                    ? ""
+                    : String(contributors[member.id])
+                }
+                onChangeText={(value) =>
+                  setContributors((current) => ({
+                    ...current,
+                    [member.id]: value,
+                  }))
+                }
+                style={styles.contributorInput}
+                keyboardType="numeric"
+                placeholder="BDT"
+              />
+            </View>
+          ))}
+          <Button
+            variant="outline"
+            onPress={() => {
+              const count = members.length || 1;
+              const perPerson = Number(amount || 0) / count;
+              const next = {};
+              members.forEach((member) => {
+                next[member.id] = perPerson ? Number(perPerson.toFixed(2)) : "";
+              });
+              setContributors(next);
             }}
-          />
-        </div>
+          >
+            Split contribution equally
+          </Button>
+        </View>
 
-        {/* Member selector */}
-        <MemberSelector
-          members={members}
-          selectedIds={memberIds}
-          onChange={setMemberIds}
-        />
+        <Text style={styles.label}>Split type</Text>
+        <View style={styles.toggleRow}>
+          {["equal", "custom", "percentage"].map((type) => (
+            <Button
+              key={type}
+              variant={splitType === type ? "primary" : "outline"}
+              onPress={() => {
+                setSplitType(type);
+                setCustomAmounts({});
+              }}
+            >
+              {type}
+            </Button>
+          ))}
+        </View>
 
-        {/* Custom / Percentage inputs */}
-        {(splitType === 'custom' || splitType === 'percentage') && (
-          <CustomAmountInputs
-            members={members}
-            selectedIds={memberIds}
-            customAmounts={customAmounts}
-            onChange={setCustomAmounts}
-            totalAmount={Number(amount) || 0}
-            splitType={splitType}
-          />
-        )}
-
-        {/* Share preview */}
-        <SharePreview members={members} expense={previewExpense} />
-
-        {/* Error */}
-        {error && (
-          <p className="text-xs text-red-500 font-bold px-1">{error}</p>
-        )}
-
-        {/* Submit */}
-        <Button
-          className="w-full"
-          onClick={handleAdd}
-          disabled={!title.trim() || !amount || !memberIds.length}
+        <Text style={styles.label}>Ke ke involved?</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipRow}
         >
-          + Add expense
-        </Button>
-      </div>
+          {members.map((member) => (
+            <Button
+              key={member.id}
+              variant={selectedIds.includes(member.id) ? "primary" : "outline"}
+              onPress={() => toggleMember(member.id)}
+            >
+              <View style={styles.memberChip}>
+                <MemberAvatar member={member} size="sm" />
+                <Text
+                  style={[
+                    styles.memberChipText,
+                    selectedIds.includes(member.id) &&
+                      styles.memberChipTextActive,
+                  ]}
+                >
+                  {member.name}
+                </Text>
+              </View>
+            </Button>
+          ))}
+        </ScrollView>
 
-      {/* Expense list */}
-      {expenses.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-slate-100">
-          <SplitExpenseList
-            expenses={expenses}
-            members={members}
-            onDelete={onDelete}
-          />
-        </div>
-      )}
+        {splitType !== "equal" ? (
+          <View style={styles.customGrid}>
+            {members
+              .filter((member) => selectedIds.includes(member.id))
+              .map((member) => (
+                <View key={member.id} style={styles.customRow}>
+                  <Text style={styles.customLabel}>{member.name}</Text>
+                  <TextInput
+                    value={String(customAmounts[member.id] || "")}
+                    onChangeText={(value) =>
+                      setCustomAmounts({
+                        ...customAmounts,
+                        [member.id]: value,
+                      })
+                    }
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholder={splitType === "percentage" ? "%" : "BDT"}
+                  />
+                </View>
+              ))}
+          </View>
+        ) : null}
+
+        {selectedIds.length && Number(amount) > 0 ? (
+          <View style={styles.previewCard}>
+            <Text style={styles.previewTitle}>Share preview</Text>
+            {members
+              .filter((member) => selectedIds.includes(member.id))
+              .map((member) => (
+                <View key={member.id} style={styles.previewRow}>
+                  <Text>{member.name}</Text>
+                  <Text style={styles.previewValue}>
+                    {money(shares[member.id] || 0)}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        ) : null}
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Button
+          onPress={handleAdd}
+          disabled={!title.trim() || !amount || !selectedIds.length}
+        >
+          Add expense
+        </Button>
+      </View>
+
+      {expenses.length ? (
+        <View style={styles.expenseList}>
+          <Text style={styles.expenseCount}>
+            {expenses.length} ta expense added
+          </Text>
+          {expenses.map((expense) => (
+            <View key={expense.id} style={styles.expenseRow}>
+              <View>
+                <Text style={styles.expenseTitle}>{expense.title}</Text>
+                <Text style={styles.expenseMeta}>
+                  {expense.memberIds?.length || 0} jon split - {expense.date}
+                </Text>
+              </View>
+              <View style={styles.expenseAmount}>
+                <Text style={styles.expenseValue}>{money(expense.amount)}</Text>
+                <Button variant="danger" onPress={() => onDelete(expense.id)}>
+                  Delete
+                </Button>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  subtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748b",
+  },
+  form: {
+    gap: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  chipRow: {
+    flexGrow: 0,
+  },
+  contributorList: {
+    gap: 8,
+  },
+  contributorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    backgroundColor: "#f8fafc",
+    padding: 8,
+    borderRadius: 10,
+  },
+  contributorInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  contributorName: {
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  contributorInput: {
+    minWidth: 90,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: "#ffffff",
+    textAlign: "right",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  memberChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  memberChipText: {
+    color: "#0f172a",
+    fontWeight: "700",
+  },
+  memberChipTextActive: {
+    color: "#ffffff",
+  },
+  customGrid: {
+    gap: 10,
+  },
+  customRow: {
+    gap: 6,
+  },
+  customLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  previewCard: {
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  previewTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  previewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  previewValue: {
+    fontWeight: "700",
+  },
+  error: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#dc2626",
+  },
+  expenseList: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+    paddingTop: 12,
+    gap: 10,
+  },
+  expenseCount: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  expenseRow: {
+    backgroundColor: "#f8fafc",
+    padding: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  expenseTitle: {
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  expenseMeta: {
+    fontSize: 11,
+    color: "#64748b",
+  },
+  expenseAmount: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  expenseValue: {
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  emptyCard: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1e293b",
+  },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+  },
+});
 
 export default ExpenseSplitter;

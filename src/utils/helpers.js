@@ -3,8 +3,15 @@ export const todayLabel = new Date().toLocaleDateString("en-GB", {
   month: "short",
 });
 
+export function createId(prefix = "id") {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function money(n) {
-  return `${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} BDT`;
+  return `${Number(n || 0).toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  })} BDT`;
 }
 
 export function parseNumber(text) {
@@ -43,22 +50,28 @@ export function parseReceiptNumber(token) {
 export function detectCategory(text) {
   const lower = String(text || "").toLowerCase();
   if (
-    /bus|বাস|rickshaw|রিকশা|uber|pathao|cng|fare|transport|bara|bhara|vara|vahara|ভাড়া|ভাড়া/.test(
+    /bus|rickshaw|uber|pathao|cng|fare|transport|bara|bhara|vara|vahara/.test(
       lower,
     )
   ) {
     return {
       category: "Transport",
-      subcategory:
-        lower.includes("bus") || lower.includes("বাস")
-          ? "Bus/Fare"
-          : "Ride/Fare",
+      subcategory: lower.includes("bus") ? "Bus/Fare" : "Ride/Fare",
     };
   }
-  if (/mobile|recharge|internet|data|wifi|sim|flexi/.test(lower))
+  if (
+    /suit|shirt|pant|jeans|jacket|clothes|cloth|shopping|boutique|dress|sharee|saree|shoe|bag|accessor|cosmetic/.test(
+      lower,
+    )
+  ) {
+    return { category: "Shopping", subcategory: "Clothes" };
+  }
+  if (/mobile|recharge|internet|data|wifi|sim|flexi/.test(lower)) {
     return { category: "Utilities", subcategory: "Mobile/Internet" };
-  if (/biya|biye|wedding|dawat|dawa|gift|party|treat/.test(lower))
+  }
+  if (/biya|biye|wedding|dawat|dawa|gift|party|treat/.test(lower)) {
     return { category: "Social", subcategory: "Gift/Event" };
+  }
   if (
     /egg|spinach|palong|alu|amaranth|shak|vegetable|grocery|bazaar|rice|oil|loose|pcs/.test(
       lower,
@@ -67,29 +80,30 @@ export function detectCategory(text) {
     return { category: "Groceries", subcategory: "Household" };
   }
   if (
-    /lunch|dinner|breakfast|coffee|tea|food|snack|singara|burger|pizza|biryani|canteen|khabar|khawa/.test(
+    /lunch|dinner|breakfast|coffee|tea|food|snack|singara|burger|pizza|biryani|canteen|khabar|khawa|fuchka/.test(
       lower,
     )
   ) {
     return { category: "Food", subcategory: "Meal" };
   }
-  if (/netflix|spotify|movie|cinema|game|subscription/.test(lower))
+  if (/netflix|spotify|movie|cinema|game|subscription/.test(lower)) {
     return { category: "Entertainment", subcategory: "Streaming" };
-  if (/beer|whisky|vodka|drink|pub\b|bar\b/.test(lower))
-    return { category: "Entertainment", subcategory: "Drinks" };
-  if (/book|pen|notebook|stationery|class|exam|tuition|course/.test(lower))
+  }
+  if (/book|pen|notebook|stationery|class|exam|tuition|course/.test(lower)) {
     return { category: "Education", subcategory: "Study" };
-  if (/medicine|doctor|hospital|pharmacy/.test(lower))
+  }
+  if (/medicine|doctor|hospital|pharmacy/.test(lower)) {
     return { category: "Health", subcategory: "Medical" };
+  }
   return { category: "Miscellaneous", subcategory: "General" };
 }
 
-export function calcTotalSpent(expenses) {
+export function calcTotalSpent(expenses = []) {
   return expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 }
 
 export function calcRemaining(monthlyBudget, totalSpent) {
-  return Math.max(monthlyBudget - totalSpent, 0);
+  return Math.max(Number(monthlyBudget || 0) - Number(totalSpent || 0), 0);
 }
 
 export function calcHealthScore(remaining, monthlyBudget) {
@@ -97,11 +111,37 @@ export function calcHealthScore(remaining, monthlyBudget) {
     0,
     Math.min(
       100,
-      Math.round((remaining / Math.max(monthlyBudget, 1)) * 90 + 10),
+      Math.round(
+        (Number(remaining || 0) / Math.max(Number(monthlyBudget || 0), 1)) *
+          90 +
+          10,
+      ),
     ),
   );
 }
 
 export function calcDailyAvg(totalSpent, daysPassed = 12) {
-  return daysPassed ? totalSpent / daysPassed : 0;
+  return daysPassed ? Number(totalSpent || 0) / daysPassed : 0;
+}
+
+export function calcBudgetStatus(monthlyBudget, totalSpent, date = new Date()) {
+  const daysInMonth = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+  ).getDate();
+  const dayOfMonth = Math.max(1, date.getDate());
+  const projectedSpend = dayOfMonth
+    ? (Number(totalSpent || 0) / dayOfMonth) * daysInMonth
+    : 0;
+  const safeLimit = Number(monthlyBudget || 0) * 1.05;
+  const warningLimit = Number(monthlyBudget || 0) * 1.2;
+
+  if (projectedSpend <= safeLimit) {
+    return { status: "Safe", projectedSpend };
+  }
+  if (projectedSpend <= warningLimit) {
+    return { status: "Warning", projectedSpend };
+  }
+  return { status: "Critical", projectedSpend };
 }

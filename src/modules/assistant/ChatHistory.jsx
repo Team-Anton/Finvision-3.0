@@ -1,90 +1,106 @@
-import { useEffect, useRef } from "react";
-
-function MessageBubble({ message }) {
-  const isUser = message.role === "user";
-
-  return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-          isUser ? "bg-slate-950 text-white" : "bg-emerald-100 text-emerald-700"
-        }`}
-      >
-        {isUser ? "U" : "🤖"}
-      </div>
-      <div
-        className={`max-w-[80%] rounded-3xl px-4 py-3 text-sm ${
-          isUser
-            ? "rounded-tr-sm bg-slate-950 text-white"
-            : "rounded-tl-sm bg-slate-100 text-slate-950"
-        }`}
-      >
-        <p className="leading-relaxed">{message.text}</p>
-        {!isUser && message.insight ? (
-          <p className="mt-2 whitespace-pre-line border-t border-slate-200 pt-2 text-xs text-slate-500">
-            💡 {message.insight}
-          </p>
-        ) : null}
-        <p
-          className={`mt-2 text-xs text-slate-400 ${
-            isUser ? "text-right" : ""
-          }`}
-        >
-          {new Date().toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-        🤖
-      </div>
-      <div className="flex items-center gap-1 rounded-3xl rounded-tl-sm bg-slate-100 px-4 py-3">
-        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="py-10 text-center">
-      <div className="text-5xl">💬</div>
-      <p className="mt-3 font-bold">Kono conversation nei</p>
-      <p className="mt-1 text-sm text-slate-400">
-        Upore input box e likhle chat shuru hobe.
-      </p>
-    </div>
-  );
-}
+import React from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 function ChatHistory({ chatLog = [], isTyping = false }) {
-  const bottomRef = useRef(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatLog, isTyping]);
-
-  if (chatLog.length === 0) return <EmptyState />;
+  if (!chatLog.length && !isTyping) {
+    return (
+      <View style={styles.emptyCard}>
+        <Text style={styles.emptyTitle}>Kono conversation nei</Text>
+        <Text style={styles.emptySubtitle}>
+          Upore input box e likhle chat shuru hobe.
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <div className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
-      {chatLog.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
-      ))}
-      {isTyping ? <TypingIndicator /> : null}
-      <div ref={bottomRef} />
-    </div>
+    <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      {chatLog.map((message) => {
+        const isUser = message.role === "user";
+        return (
+          <View
+            key={message.id}
+            style={[styles.row, isUser && styles.rowRight]}
+          >
+            <View
+              style={[
+                styles.bubble,
+                isUser ? styles.userBubble : styles.assistantBubble,
+              ]}
+            >
+              <Text style={isUser ? styles.userText : styles.assistantText}>
+                {message.text}
+              </Text>
+              {!isUser && message.insight ? (
+                <Text style={styles.insight}>{message.insight}</Text>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+      {isTyping ? <Text style={styles.typing}>Typing...</Text> : null}
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  emptyCard: {
+    backgroundColor: "#f8fafc",
+    padding: 24,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    fontWeight: "800",
+    color: "#1e293b",
+  },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+  },
+  list: {
+    maxHeight: 420,
+  },
+  listContent: {
+    gap: 10,
+    paddingBottom: 6,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  rowRight: {
+    justifyContent: "flex-end",
+  },
+  bubble: {
+    maxWidth: "82%",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  userBubble: {
+    backgroundColor: "#0f172a",
+  },
+  assistantBubble: {
+    backgroundColor: "#f1f5f9",
+  },
+  userText: {
+    color: "#ffffff",
+  },
+  assistantText: {
+    color: "#0f172a",
+  },
+  insight: {
+    marginTop: 6,
+    fontSize: 11,
+    color: "#64748b",
+  },
+  typing: {
+    fontSize: 12,
+    color: "#94a3b8",
+  },
+});
 
 export default ChatHistory;

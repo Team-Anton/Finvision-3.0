@@ -1,4 +1,4 @@
-import { todayLabel } from "./helpers";
+import { createId } from "./helpers";
 
 export const categories = [
   {
@@ -32,6 +32,10 @@ export const categories = [
     category: "Entertainment",
     subcategories: ["Streaming", "Movie", "Drinks", "Games"],
   },
+  {
+    category: "Shopping",
+    subcategories: ["Clothes", "Accessories", "General"],
+  },
   { category: "Social", subcategories: ["Gift/Event", "Wedding", "Treat"] },
   { category: "Income", subcategories: ["Salary", "Allowance", "Refund"] },
   { category: "Miscellaneous", subcategories: ["General"] },
@@ -47,33 +51,38 @@ export const samplePrompts = [
 ];
 
 export const navTabs = [
-  { key: "assistant", label: "🤖 AI Assistant" },
-  { key: "dashboard", label: "📊 Dashboard" },
-  { key: "receipt", label: "📷 Receipt" },
-  { key: "group", label: "👥 Group Split" },
-  { key: "store", label: "🏪 Store Ready" },
+  { key: "assistant", label: "AI Assistant" },
+  { key: "dashboard", label: "Dashboard" },
+  { key: "receipt", label: "Receipt" },
+  { key: "group", label: "Group Split" },
 ];
 
 export const defaultExpenses = [
   {
-    id: crypto.randomUUID(),
+    id: createId("expense"),
     amount: 120,
     currency: "BDT",
     category: "Food",
     subcategory: "Snacks",
     note: "Singara and tea",
     merchant: "Campus Canteen",
-    date: todayLabel,
+    date: new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+    }),
   },
   {
-    id: crypto.randomUUID(),
+    id: createId("expense"),
     amount: 80,
     currency: "BDT",
     category: "Transport",
     subcategory: "Bus/Fare",
     note: "Bus to UIU",
     merchant: null,
-    date: todayLabel,
+    date: new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+    }),
   },
 ];
 
@@ -82,3 +91,5 @@ export const DAYS_IN_MONTH = 30;
 export const DAYS_PASSED = 12;
 export const CURRENCY = "BDT";
 export const LOCAL_STORAGE_KEY = "finvision-v3";
+export const OCR_SPACE_API_KEY = "helloworld";
+export const OCR_SPACE_ENDPOINT = "https://api.ocr.space/parse/image";

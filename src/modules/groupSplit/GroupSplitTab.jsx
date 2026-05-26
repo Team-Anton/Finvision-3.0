@@ -1,344 +1,202 @@
-import React, { useState, useMemo } from 'react';
-import { getGroupStats, createMember } from './SplitEngine';
-import MemberList from './MemberList';
-import ExpenseSplitter from './ExpenseSplitter';
-import SettlementSummary from './SettlementSummary';
-import { money } from '../../utils/helpers';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
+import React, { useMemo, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import Button from "../../components/Button";
+import Card from "../../components/Card";
+import { money } from "../../utils/helpers";
+import ExpenseSplitter from "./ExpenseSplitter";
+import MemberList from "./MemberList";
+import SettlementSummary from "./SettlementSummary";
+import WalletPanel from "./WalletPanel";
+import {
+  createSplitExpense,
+  getGroupStats,
+  WALLET_MEMBER,
+} from "./SplitEngine";
 
-// ─── PRESETS ────────────────────────────────────────────────────────────
-const PRESETS = [
-  {
-    key: 'trip',
-    label: '✈️ Trip',
-    sub: 'Travel group er jonno',
-    members: ['Rahim', 'Karim', 'Sadia', 'Nadia'],
-  },
-  {
-    key: 'roommates',
-    label: '🏠 Roommates',
-    sub: 'Basha share er jonno',
-    members: ['Rafi', 'Arif', 'Toma'],
-  },
-  {
-    key: 'friends',
-    label: '👫 Friends',
-    sub: 'Bondhura miley khoroch',
-    members: ['Mitu', 'Ritu', 'Titu'],
-  },
-];
-
-// ─── PresetSelector ─────────────────────────────────────────────────────
-function PresetSelector({ onPreset }) {
-  return (
-    <div className="space-y-3">
-      <p className="text-sm font-bold text-slate-500">
-        Quick start — preset choose koro:
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.key}
-            onClick={() => onPreset(preset)}
-            className="rounded-2xl border-2 border-slate-200 bg-white p-4 text-left hover:border-slate-950 hover:bg-slate-50 transition"
-          >
-            <p className="font-black">{preset.label}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{preset.sub}</p>
-            <div className="mt-2 flex gap-1 flex-wrap">
-              {preset.members.map((name) => (
-                <span
-                  key={name}
-                  className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                >
-                  {name}
-                </span>
-              ))}
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── TopStatsBanner ─────────────────────────────────────────────────────
-function TopStatsBanner({ members, expenses }) {
-  const stats = getGroupStats(members, expenses);
-  if (!members.length) return null;
-
-  return (
-    <div className="rounded-3xl bg-slate-950 p-5 text-white">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        {/* LEFT */}
-        <div>
-          <p className="text-xs text-slate-400">Group total</p>
-          <p className="text-3xl font-black">{money(stats.totalExpenses)}</p>
-          {stats.memberCount > 0 && (
-            <p className="text-sm text-slate-300 mt-0.5">
-              {money(stats.perPerson)} per person · {stats.memberCount} members
-            </p>
-          )}
-        </div>
-
-        {/* RIGHT */}
-        <div className="flex gap-3 flex-wrap">
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-center">
-            <p className="text-xs text-slate-400">Expenses</p>
-            <p className="text-2xl font-black">{stats.expenseCount}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-center">
-            <p className="text-xs text-slate-400">Settlements</p>
-            <p className="text-2xl font-black">{stats.settlementCount}</p>
-          </div>
-          <div
-            className={`rounded-2xl px-4 py-3 text-center ${
-              stats.isSettled && stats.expenseCount > 0
-                ? 'bg-emerald-400/20'
-                : 'bg-white/10'
-            }`}
-          >
-            <p className="text-xs text-slate-400">Status</p>
-            <p className="text-2xl font-black">
-              {stats.expenseCount === 0
-                ? '—'
-                : stats.isSettled
-                ? '✅ Settled'
-                : '⏳ Pending'}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── SectionTabs ────────────────────────────────────────────────────────
-function SectionTabs({ selected, onChange, expenseCount }) {
-  const tabs = [
-    { key: 'split', label: '➕ Add Expense' },
-    {
-      key: 'settle',
-      label: `🧮 Settle Up${expenseCount ? ` (${expenseCount})` : ''}`,
-    },
-  ];
-
-  return (
-    <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => onChange(tab.key)}
-          className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-            selected === tab.key
-              ? 'bg-white text-slate-950 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── ResetButton ────────────────────────────────────────────────────────
-function ResetButton({ onReset }) {
-  const [confirm, setConfirm] = useState(false);
-
-  function handleClick() {
-    if (confirm) {
-      onReset();
-      setConfirm(false);
-    } else {
-      setConfirm(true);
-      setTimeout(() => setConfirm(false), 3000);
-    }
-  }
-
-  return (
-    <Button
-      variant={confirm ? 'danger' : 'outline'}
-      className="text-xs"
-      onClick={handleClick}
-    >
-      {confirm ? '⚠️ Confirm reset?' : '🗑️ Reset group'}
-    </Button>
-  );
-}
-
-// ─── WelcomeScreen ──────────────────────────────────────────────────────
-function WelcomeScreen({ onPreset }) {
-  return (
-    <Card className="p-8">
-      <div className="text-center mb-6">
-        <p className="text-6xl mb-3">👥</p>
-        <h2 className="text-2xl font-black">Group Split</h2>
-        <p className="text-slate-500 mt-2 max-w-md mx-auto">
-          Trip, roommates, ba bondhura miley khoroch split koro. Minimum
-          transactions e settle korar plan automatically banabe.
-        </p>
-      </div>
-      <PresetSelector onPreset={onPreset} />
-    </Card>
-  );
-}
-
-// ─── HowItWorks ─────────────────────────────────────────────────────────
-function HowItWorks() {
-  const steps = [
-    {
-      icon: '👥',
-      title: 'Members add koro',
-      sub: 'Group er shobai ke add koro',
-    },
-    {
-      icon: '💸',
-      title: 'Expense add koro',
-      sub: 'Ke pay korlo, ke ke involved',
-    },
-    {
-      icon: '⚖️',
-      title: 'Split choose koro',
-      sub: 'Equal, custom, ba percentage',
-    },
-    {
-      icon: '🧮',
-      title: 'Settle up',
-      sub: 'Minimum payments e plan dekhao',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-      {steps.map((step) => (
-        <div
-          key={step.title}
-          className="rounded-2xl bg-slate-50 p-4 text-center"
-        >
-          <p className="text-3xl mb-2">{step.icon}</p>
-          <p className="text-sm font-black">{step.title}</p>
-          <p className="text-xs text-slate-400 mt-1">{step.sub}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── GroupSplitTab (DEFAULT EXPORT) ─────────────────────────────────────
 function GroupSplitTab() {
   const [members, setMembers] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [section, setSection] = useState('split');
-  const [showWelcome, setShowWelcome] = useState(true);
-
+  const [section, setSection] = useState("split");
+  const walletMember = WALLET_MEMBER;
+  const membersWithWallet = useMemo(
+    () => [...members, walletMember],
+    [members, walletMember],
+  );
   const stats = useMemo(
     () => getGroupStats(members, expenses),
-    [members, expenses]
+    [members, expenses],
   );
 
-  function handlePreset(preset) {
-    const newMembers = preset.members.map((name, i) => createMember(name, i));
-    setMembers(newMembers);
-    setExpenses([]);
-    setShowWelcome(false);
-  }
-
-  function handleAddMember(member) {
-    setMembers((prev) => [...prev, member]);
-    setShowWelcome(false);
-  }
-
-  function handleDeleteMember(id) {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-    setExpenses((prev) =>
-      prev.filter(
-        (e) =>
-          e.paidById !== id && !(e.memberIds || []).includes(id)
-      )
+  function deleteMember(id) {
+    setMembers((current) => current.filter((member) => member.id !== id));
+    setExpenses((current) =>
+      current.filter(
+        (expense) =>
+          expense.paidById !== id &&
+          !(expense.memberIds || []).includes(id) &&
+          !(expense.contributors || []).some(
+            (contributor) => contributor.memberId === id,
+          ),
+      ),
     );
   }
 
-  function handleAddExpense(expense) {
-    setExpenses((prev) => [...prev, expense]);
-    if (stats.settlementCount === 0) setSection('settle');
+  function addWalletDeposit(memberId, amount) {
+    const expense = createSplitExpense({
+      title: "Wallet deposit",
+      amount: Number(amount),
+      contributors: [{ memberId, amount: Number(amount) }],
+      memberIds: [walletMember.id],
+      splitType: "equal",
+      customAmounts: {},
+    });
+    setExpenses((current) => [...current, expense]);
   }
 
-  function handleDeleteExpense(id) {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
-  }
-
-  function handleReset() {
-    setMembers([]);
-    setExpenses([]);
-    setShowWelcome(true);
-    setSection('split');
-  }
-
-  // ─── Welcome view ─────────────────────────────────────────────
-  if (showWelcome && members.length === 0) {
-    return (
-      <main className="space-y-5">
-        <WelcomeScreen onPreset={handlePreset} />
-        <HowItWorks />
-        <Card padding={false} className="p-6">
-          <h3 className="text-lg font-black">Ba manually shuru koro</h3>
-          <p className="text-xs text-slate-400">
-            Nijer moto member add kore shuru koro.
-          </p>
-          <div className="mt-4">
-            <MemberList
-              members={members}
-              expenses={expenses}
-              onAdd={handleAddMember}
-              onDelete={handleDeleteMember}
-            />
-          </div>
-        </Card>
-      </main>
-    );
-  }
-
-  // ─── Main view ────────────────────────────────────────────────
   return (
-    <main className="space-y-5">
-      <TopStatsBanner members={members} expenses={expenses} />
+    <View style={styles.wrapper}>
+      {!members.length ? (
+        <Card>
+          <View style={styles.center}>
+            <Text style={styles.heroTitle}>Group Split</Text>
+            <Text style={styles.heroSubtitle}>
+              Member add kore group khoroch split koro.
+            </Text>
+          </View>
+        </Card>
+      ) : (
+        <Card style={styles.summaryCard}>
+          <View style={styles.summaryRow}>
+            <View>
+              <Text style={styles.summaryLabel}>Group total</Text>
+              <Text style={styles.summaryValue}>
+                {money(stats.totalExpenses)}
+              </Text>
+              <Text style={styles.summaryHint}>
+                {money(stats.perPerson)} per person - {stats.memberCount}{" "}
+                members
+              </Text>
+            </View>
+            <View style={styles.summaryActions}>
+              <Button
+                variant={section === "split" ? "warning" : "outline"}
+                onPress={() => setSection("split")}
+              >
+                Add Expense
+              </Button>
+              <Button
+                variant={section === "settle" ? "warning" : "outline"}
+                onPress={() => setSection("settle")}
+              >
+                Settle Up ({expenses.length})
+              </Button>
+              <Button
+                variant="danger"
+                onPress={() => {
+                  setMembers([]);
+                  setExpenses([]);
+                  setSection("split");
+                }}
+              >
+                Reset
+              </Button>
+            </View>
+          </View>
+        </Card>
+      )}
 
-      {/* Controls */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <SectionTabs
-          selected={section}
-          onChange={setSection}
-          expenseCount={expenses.length}
-        />
-        <ResetButton onReset={handleReset} />
-      </div>
-
-      {/* Main grid */}
-      <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-        {/* Left */}
+      <View style={styles.grid}>
         <MemberList
           members={members}
           expenses={expenses}
-          onAdd={handleAddMember}
-          onDelete={handleDeleteMember}
+          onAdd={(member) => setMembers((current) => [...current, member])}
+          onDelete={deleteMember}
         />
-
-        {/* Right */}
-        {section === 'split' && (
-          <ExpenseSplitter
-            members={members}
-            expenses={expenses}
-            onAdd={handleAddExpense}
-            onDelete={handleDeleteExpense}
-          />
+        {section === "split" ? (
+          <View style={styles.splitColumn}>
+            <WalletPanel
+              members={members}
+              walletMember={walletMember}
+              expenses={expenses}
+              onDeposit={addWalletDeposit}
+            />
+            <ExpenseSplitter
+              members={members}
+              walletMember={walletMember}
+              expenses={expenses}
+              onAdd={(expense) => {
+                setExpenses((current) => [...current, expense]);
+                setSection("settle");
+              }}
+              onDelete={(id) =>
+                setExpenses((current) =>
+                  current.filter((expense) => expense.id !== id),
+                )
+              }
+            />
+          </View>
+        ) : (
+          <SettlementSummary members={membersWithWallet} expenses={expenses} />
         )}
-        {section === 'settle' && (
-          <SettlementSummary members={members} expenses={expenses} />
-        )}
-      </div>
-    </main>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: {
+    gap: 16,
+  },
+  center: {
+    alignItems: "center",
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  heroSubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+  },
+  summaryCard: {
+    backgroundColor: "#0f172a",
+    borderColor: "#0f172a",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  summaryLabel: {
+    color: "#cbd5f5",
+    fontSize: 12,
+  },
+  summaryValue: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  summaryHint: {
+    color: "#cbd5f5",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  summaryActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  grid: {
+    gap: 16,
+  },
+  splitColumn: {
+    gap: 16,
+  },
+});
 
 export default GroupSplitTab;

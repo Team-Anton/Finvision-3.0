@@ -1,185 +1,207 @@
-import { useState } from "react";
+import React, { useMemo, useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { money } from "../../utils/helpers";
+import Button from "../../components/Button";
 
-const categoryColors = {
-  Food: "bg-orange-100 text-orange-700",
-  Transport: "bg-blue-100 text-blue-700",
-  Groceries: "bg-green-100 text-green-700",
-  Utilities: "bg-purple-100 text-purple-700",
-  Education: "bg-yellow-100 text-yellow-700",
-  Health: "bg-red-100 text-red-700",
-  Entertainment: "bg-pink-100 text-pink-700",
-  Social: "bg-indigo-100 text-indigo-700",
-  Income: "bg-emerald-100 text-emerald-700",
-  Miscellaneous: "bg-slate-100 text-slate-700",
-};
-
-const categoryIcons = {
-  Food: "🍱",
-  Transport: "🚌",
-  Groceries: "🛒",
-  Utilities: "📱",
-  Education: "📚",
-  Health: "💊",
-  Entertainment: "🎬",
-  Social: "🎁",
-  Income: "💰",
-  Miscellaneous: "📌",
-};
-
-function ExpenseRow({ expense, onDelete }) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const colorClass =
-    categoryColors[expense.category] || "bg-slate-100 text-slate-700";
-  const icon = categoryIcons[expense.category] || "📌";
-  const isNegative = Number(expense.amount) < 0;
-
-  function handleDeleteClick() {
-    if (confirmDelete) {
-      onDelete?.(expense.id);
-      return;
-    }
-
-    setConfirmDelete(true);
-    setTimeout(() => setConfirmDelete(false), 3000);
-  }
-
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 transition hover:bg-slate-100">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className={`shrink-0 rounded-2xl p-2 text-xl ${colorClass}`}>
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-bold">{expense.category}</p>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] ${colorClass}`}>
-              {expense.subcategory}
-            </span>
-          </div>
-          <p className="truncate text-xs text-slate-500">{expense.note}</p>
-          {expense.merchant ? (
-            <p className="text-xs text-slate-400">📍 {expense.merchant}</p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="ml-3 flex shrink-0 items-center gap-3">
-        <div className="text-right">
-          <p
-            className={`text-sm font-black ${
-              isNegative ? "text-emerald-600" : "text-slate-950"
-            }`}
-          >
-            {isNegative ? "+" : "-"}
-            {Math.abs(Number(expense.amount || 0)).toLocaleString()} BDT
-          </p>
-          <p className="text-xs text-slate-400">{expense.date}</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleDeleteClick}
-          className={`h-7 w-7 rounded-full text-sm font-black transition ${
-            confirmDelete
-              ? "bg-red-500 text-white"
-              : "bg-slate-200 text-slate-500 hover:bg-red-100 hover:text-red-500"
-          }`}
-          aria-label={confirmDelete ? "Confirm delete" : "Delete expense"}
-        >
-          {confirmDelete ? "!" : "×"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function EmptyExpenses() {
-  return (
-    <div className="py-10 text-center">
-      <div className="text-5xl">🧾</div>
-      <p className="mt-3 font-bold">Kono khoroch nei</p>
-      <p className="mt-1 text-sm text-slate-400">
-        Assistant e expense add korle ekhane dekhabe.
-      </p>
-    </div>
-  );
-}
-
-function FilterBar({ selected, onChange }) {
-  const filters = [
-    "All",
-    "Food",
-    "Transport",
-    "Groceries",
-    "Utilities",
-    "Health",
-    "Income",
-  ];
-
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-2">
-      {filters.map((filter) => (
-        <button
-          key={filter}
-          type="button"
-          onClick={() => onChange(filter)}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
-            selected === filter
-              ? "bg-slate-950 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          {filter}
-        </button>
-      ))}
-    </div>
-  );
-}
+const filters = [
+  "All",
+  "Food",
+  "Transport",
+  "Groceries",
+  "Utilities",
+  "Shopping",
+  "Health",
+  "Income",
+];
 
 function ExpenseList({ expenses = [], onDelete }) {
   const [filter, setFilter] = useState("All");
   const [showAll, setShowAll] = useState(false);
 
-  const filtered =
-    filter === "All"
-      ? expenses
-      : expenses.filter((expense) => expense.category === filter);
+  const filtered = useMemo(() => {
+    if (filter === "All") return expenses;
+    return expenses.filter((expense) => expense.category === filter);
+  }, [expenses, filter]);
+
   const visible = showAll ? filtered : filtered.slice(0, 5);
-  const hasMore = filtered.length > 5;
 
   return (
-    <div className="space-y-3">
-      <FilterBar selected={filter} onChange={setFilter} />
-      {filtered.length > 0 ? (
-        <p className="text-xs font-bold text-slate-400">
-          {filtered.length} ta entry{filter !== "All" ? ` (${filter})` : ""}
-        </p>
-      ) : null}
+    <View style={styles.wrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterRow}
+      >
+        {filters.map((item) => (
+          <TouchableOpacity
+            key={item}
+            onPress={() => setFilter(item)}
+            style={[
+              styles.filterChip,
+              filter === item && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterText,
+                filter === item && styles.filterTextActive,
+              ]}
+            >
+              {item}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-      {filtered.length === 0 ? (
-        <EmptyExpenses />
+      {!filtered.length ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Kono khoroch nei</Text>
+          <Text style={styles.emptySubtitle}>
+            Assistant e expense add korle ekhane dekhabe.
+          </Text>
+        </View>
       ) : (
-        <div className="space-y-3">
+        <View style={styles.list}>
           {visible.map((expense) => (
-            <ExpenseRow
-              key={expense.id}
-              expense={expense}
-              onDelete={onDelete}
-            />
+            <View key={expense.id} style={styles.itemCard}>
+              <View style={styles.itemHeader}>
+                <View>
+                  <View style={styles.categoryRow}>
+                    <Text style={styles.category}>{expense.category}</Text>
+                    <View style={styles.subcategoryPill}>
+                      <Text style={styles.subcategoryText}>
+                        {expense.subcategory}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.note}>{expense.note}</Text>
+                  <Text style={styles.meta}>
+                    {expense.merchant || "No merchant"} - {expense.date}
+                  </Text>
+                </View>
+                <View style={styles.amountBlock}>
+                  <Text style={styles.amount}>{money(expense.amount)}</Text>
+                  <Button
+                    variant="danger"
+                    onPress={() => onDelete?.(expense.id)}
+                  >
+                    Delete
+                  </Button>
+                </View>
+              </View>
+            </View>
           ))}
-        </div>
+        </View>
       )}
 
-      {hasMore ? (
-        <button
-          type="button"
-          onClick={() => setShowAll((current) => !current)}
-          className="w-full rounded-2xl border border-slate-200 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-50"
-        >
-          {showAll ? "▲ Kom dekhao" : `▼ Aro ${filtered.length - 5} ta dekhao`}
-        </button>
+      {filtered.length > 5 ? (
+        <Button variant="outline" onPress={() => setShowAll((value) => !value)}>
+          {showAll ? "Kom dekhao" : `Aro ${filtered.length - 5} ta dekhao`}
+        </Button>
       ) : null}
-    </div>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginTop: 12,
+    gap: 12,
+  },
+  filterRow: {
+    flexGrow: 0,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#e2e8f0",
+    marginRight: 8,
+  },
+  filterChipActive: {
+    backgroundColor: "#0f172a",
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  filterTextActive: {
+    color: "#ffffff",
+  },
+  emptyCard: {
+    backgroundColor: "#f8fafc",
+    padding: 24,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    fontWeight: "800",
+    color: "#1e293b",
+  },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+  },
+  list: {
+    gap: 10,
+  },
+  itemCard: {
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 12,
+  },
+  itemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  category: {
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  subcategoryPill: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  subcategoryText: {
+    fontSize: 11,
+    color: "#64748b",
+  },
+  note: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#475569",
+  },
+  meta: {
+    fontSize: 11,
+    color: "#94a3b8",
+    marginTop: 2,
+  },
+  amountBlock: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  amount: {
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+});
 
 export default ExpenseList;

@@ -1,42 +1,29 @@
-import { detectCategory, money, parseNumber } from "../../utils/helpers";
+import {
+  createId,
+  detectCategory,
+  money,
+  parseNumber,
+} from "../../utils/helpers";
 
-function detectIntent(lower) {
-  if (/(budget|bajet|set|বাজেট)/i.test(lower)) return "set_budget";
-  if (/(baki|remaining|left|balance|koto baki|কত বাকি)/i.test(lower)) {
-    return "check_balance";
-  }
-  if (/(afford|parbo|kinte parbo|can i)/i.test(lower)) return "check_afford";
-  if (/(income|salary|paisi|pelam|allowance|refund|joma)/i.test(lower)) {
+function detectIntent(text) {
+  if (/(clear|reset|sob bad|shob bad)/i.test(text)) return "clear_all";
+  if (/(income|salary|paisi|pelam|allowance|refund|joma)/i.test(text)) {
     return "add_income";
   }
-  if (/(delete|remove|muchi|bade dao|bad dao)/i.test(lower)) {
-    return "delete_expense";
+  if (/(budget|bajet|set)/i.test(text)) return "set_budget";
+  if (/(baki|remaining|left|balance|koto baki)/i.test(text)) {
+    return "check_balance";
   }
-  if (/(clear|reset|sob bad|shob bad)/i.test(lower)) return "clear_all";
-  if (/(history|list|show|dekhao|khoroch list)/i.test(lower)) {
+  if (/(afford|parbo|kinte parbo|can i)/i.test(text)) return "check_afford";
+  if (/(history|list|show|dekhao|khoroch list)/i.test(text)) {
     return "show_history";
   }
-  if (/(help|ki korbo|ki likhbo|commands)/i.test(lower)) return "show_help";
+  if (/(help|ki korbo|ki likhbo|commands)/i.test(text)) return "show_help";
   return "add_expense";
 }
 
-function getHelpText() {
-  return {
-    reply: "FinVision e je commands use korte parbe:",
-    insight: [
-      '💸 Expense: "bus bara 80 taka" / "lunch 150"',
-      '💰 Income: "salary paisi 15000 taka"',
-      '🎯 Budget: "set budget 12000"',
-      '📊 Balance: "amar koto baki ache?"',
-      '🤔 Afford: "can i afford 500 taka?"',
-      '📋 History: "show khoroch list"',
-    ].join("\n"),
-  };
-}
-
-function parsePrompt(text, state) {
+export function parsePrompt(text, state = {}) {
   const trimmed = String(text || "").trim();
-
   if (!trimmed) {
     return {
       action: "answer_query",
@@ -48,18 +35,27 @@ function parsePrompt(text, state) {
   const lower = trimmed.toLowerCase();
   const intent = detectIntent(lower);
   const amount = parseNumber(trimmed);
+  const expenses = state.expenses || [];
+  const monthlyBudget = state.monthlyBudget ?? state.monthly_budget ?? 0;
+  const totalSpent = state.totalSpent ?? state.total_spent ?? 0;
+  const remaining = state.remaining ?? 0;
 
   if (intent === "show_help") {
-    return { action: "answer_query", ...getHelpText() };
+    return {
+      action: "answer_query",
+      reply: "FinVision e je commands use korte parbe:",
+      insight:
+        'Expense: "bus bara 80 taka"\nIncome: "salary paisi 15000"\nBudget: "set budget 12000"\nBalance: "amar koto baki ache?"',
+    };
   }
 
   if (intent === "show_history") {
-    const lines = (state.expenses || [])
+    const lines = expenses
       .slice(0, 5)
-      .map((expense) => {
-        return `• ${expense.category} — ${money(expense.amount)} (${expense.date})`;
-      });
-
+      .map(
+        (expense) =>
+          `${expense.category} - ${money(expense.amount)} (${expense.date})`,
+      );
     return {
       action: "answer_query",
       reply: "Last 5 khoroch:",
@@ -71,43 +67,32 @@ function parsePrompt(text, state) {
     return {
       action: "set_budget",
       amount,
-      reply: `Budget ${money(amount)} set holo. ✅`,
+      reply: `Budget ${money(amount)} set holo.`,
       insight: "Ekhon theke sob khoroch ei budget er against track hobe.",
     };
   }
 
   if (intent === "check_balance") {
-    const avg = state.days_passed ? state.total_spent / state.days_passed : 0;
-    const daysLeft = avg
-      ? Math.floor(state.remaining / avg)
-      : state.days_in_month - state.days_passed;
-    const percent = Math.round(
-      (state.total_spent / Math.max(state.monthly_budget, 1)) * 100,
-    );
-
+    const percent = Math.round((totalSpent / Math.max(monthlyBudget, 1)) * 100);
     return {
       action: "answer_query",
-      reply: `Tomar baki ache ${money(state.remaining)}. 🛡️`,
-      insight: [
-        `Budget er ${percent}% khoroch hoyeche.`,
-        `Daily burn-rate ${money(Math.round(avg))}/day.`,
-        `Approx ${daysLeft} din cholbe.`,
-      ].join("\n"),
+      reply: `Tomar baki ache ${money(remaining)}.`,
+      insight: `Budget er ${percent}% khoroch hoyeche. Total spent ${money(totalSpent)}.`,
     };
   }
 
   if (intent === "check_afford" && amount) {
-    const after = state.remaining - amount;
-    const safe = after >= 0;
-
+    const after = remaining - amount;
     return {
       action: "answer_query",
-      reply: safe
-        ? `Haan, ${money(amount)} afford korte parba. ✅`
-        : `Na, ${money(amount)} dile budget ${money(Math.abs(after))} cross korbe. ⚠️`,
-      insight: safe
-        ? `Kinar por baki thakbe ${money(after)}.`
-        : "Budget barao nahole chotto khabar order koro.",
+      reply:
+        after >= 0
+          ? `Haan, ${money(amount)} afford korte parba.`
+          : `Na, ${money(amount)} dile budget ${money(Math.abs(after))} cross korbe.`,
+      insight:
+        after >= 0
+          ? `Kinar por baki thakbe ${money(after)}.`
+          : "Budget safe rakhte eta skip kora bhalo.",
     };
   }
 
@@ -115,23 +100,15 @@ function parsePrompt(text, state) {
     return {
       action: "add_income",
       amount,
-      reply: `${money(amount)} income add holo. 💰`,
-      insight: "Income budget e jog hoyeche. Remaining balance update hoyeche.",
-    };
-  }
-
-  if (intent === "delete_expense") {
-    return {
-      action: "answer_query",
-      reply: "Delete korte Recent Expenses list er × button use koro.",
-      insight: "Safety er jonno first tap confirm kore, second tap delete kore.",
+      reply: `${money(amount)} income add holo.`,
+      insight: "Income budget e jog hoyeche.",
     };
   }
 
   if (intent === "clear_all") {
     return {
       action: "clear_all",
-      reply: "Sob khoroch clear hoyeche. 🗑️",
+      reply: "Sob khoroch clear hoyeche.",
       insight: "Budget same thakbe, shudhu expense list clear hoyeche.",
     };
   }
@@ -139,31 +116,18 @@ function parsePrompt(text, state) {
   if (!amount) {
     return {
       action: "answer_query",
-      reply: "Amount ta clear na. 🤔",
+      reply: "Amount ta clear na.",
       insight: 'Example: "bus bara 80 taka" ba "lunch 150".',
     };
   }
 
-  const cat = detectCategory(trimmed);
-  const expenseIntent =
-    /(spent|spend|paid|buy|bought|kinlam|kinsi|diya|dilam|khoroch|expense|bill|fare|bara|bhara|vara|vahara|ভাড়া|bus|rickshaw|uber|pathao|recharge|lunch|dinner|coffee|tea|grocery|bazaar|gift|biya|dawa|mobile)/i.test(
-      trimmed,
-    ) || cat.category !== "Miscellaneous";
-
-  if (!expenseIntent) {
-    return {
-      action: "answer_query",
-      reply: `${money(amount)} ta expense, income, na budget set? 🤷`,
-      insight:
-        'Context dao. Example: "lunch 200 taka" ba "income 5000".',
-    };
-  }
-
+  const category = detectCategory(trimmed);
   const transaction = {
-    id: crypto.randomUUID(),
+    id: createId("expense"),
     amount,
     currency: "BDT",
-    ...cat,
+    type: "expense",
+    ...category,
     merchant: lower.includes("uber")
       ? "Uber"
       : lower.includes("pathao")
@@ -180,8 +144,8 @@ function parsePrompt(text, state) {
     action: "add_expense",
     amount,
     transaction,
-    reply: `${money(amount)} ${cat.category} — ${cat.subcategory} e add holo. ✅`,
-    insight: `Remaining: ${money(Math.max(state.remaining - amount, 0))}.`,
+    reply: `Expense added: ${money(amount)} ${category.category} - ${category.subcategory}.`,
+    insight: `Remaining: ${money(Math.max(remaining - amount, 0))}.`,
   };
 }
 

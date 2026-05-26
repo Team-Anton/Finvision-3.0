@@ -1,21 +1,34 @@
 // SplitEngine.js — Pure JavaScript calculation engine for group expense splitting.
 // No React, no JSX, no UI code.
 
+function createId(prefix = "id") {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export const MEMBER_COLORS = [
-  { bg: 'bg-violet-100', text: 'text-violet-700', hex: '#7c3aed' },
-  { bg: 'bg-blue-100', text: 'text-blue-700', hex: '#1d4ed8' },
-  { bg: 'bg-emerald-100', text: 'text-emerald-700', hex: '#047857' },
-  { bg: 'bg-orange-100', text: 'text-orange-700', hex: '#c2410c' },
-  { bg: 'bg-pink-100', text: 'text-pink-700', hex: '#be185d' },
-  { bg: 'bg-amber-100', text: 'text-amber-700', hex: '#b45309' },
-  { bg: 'bg-sky-100', text: 'text-sky-700', hex: '#0369a1' },
-  { bg: 'bg-red-100', text: 'text-red-700', hex: '#b91c1c' },
+  { bg: "bg-violet-100", text: "text-violet-700", hex: "#7c3aed" },
+  { bg: "bg-blue-100", text: "text-blue-700", hex: "#1d4ed8" },
+  { bg: "bg-emerald-100", text: "text-emerald-700", hex: "#047857" },
+  { bg: "bg-orange-100", text: "text-orange-700", hex: "#c2410c" },
+  { bg: "bg-pink-100", text: "text-pink-700", hex: "#be185d" },
+  { bg: "bg-amber-100", text: "text-amber-700", hex: "#b45309" },
+  { bg: "bg-sky-100", text: "text-sky-700", hex: "#0369a1" },
+  { bg: "bg-red-100", text: "text-red-700", hex: "#b91c1c" },
 ];
+
+export const WALLET_ID = "group-wallet";
+export const WALLET_MEMBER = {
+  id: WALLET_ID,
+  name: "Group Wallet",
+  color: { hex: "#0f172a" },
+  joinedAt: 0,
+};
 
 export function createMember(name, index) {
   return {
-    id: crypto.randomUUID(),
-    name: String(name || '').trim(),
+    id: createId("member"),
+    name: String(name || "").trim(),
     color: MEMBER_COLORS[index % MEMBER_COLORS.length],
     joinedAt: Date.now(),
   };
@@ -26,21 +39,23 @@ export function createSplitExpense({
   amount,
   paidById,
   memberIds,
-  splitType = 'equal',
+  splitType = "equal",
   customAmounts = {},
+  contributors = [],
 }) {
   return {
-    id: crypto.randomUUID(),
-    title: String(title || '').trim(),
+    id: createId("split-expense"),
+    title: String(title || "").trim(),
     amount: Number(amount) || 0,
     paidById,
+    contributors,
     memberIds,
     splitType,
     customAmounts,
     createdAt: Date.now(),
-    date: new Date().toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
+    date: new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
     }),
   };
 }
@@ -50,16 +65,16 @@ export function calcShares(expense) {
 
   const shares = {};
 
-  if (expense.splitType === 'equal') {
+  if (expense.splitType === "equal") {
     const share = expense.amount / expense.memberIds.length;
     for (const id of expense.memberIds) {
       shares[id] = Number(share.toFixed(2));
     }
-  } else if (expense.splitType === 'custom') {
+  } else if (expense.splitType === "custom") {
     for (const id of expense.memberIds) {
       shares[id] = Number(expense.customAmounts[id] || 0);
     }
-  } else if (expense.splitType === 'percentage') {
+  } else if (expense.splitType === "percentage") {
     for (const id of expense.memberIds) {
       const pct = Number(expense.customAmounts[id] || 0);
       shares[id] = Number(((expense.amount * pct) / 100).toFixed(2));
@@ -77,8 +92,17 @@ export function buildBalances(members, expenses) {
 
   for (const expense of expenses) {
     const shares = calcShares(expense);
-    // Payer gets CREDIT
-    if (balances[expense.paidById] !== undefined) {
+    const contributors = Array.isArray(expense.contributors)
+      ? expense.contributors
+      : [];
+    // Contributors get CREDIT
+    if (contributors.length) {
+      for (const contributor of contributors) {
+        if (balances[contributor.memberId] !== undefined) {
+          balances[contributor.memberId] += Number(contributor.amount || 0);
+        }
+      }
+    } else if (balances[expense.paidById] !== undefined) {
       balances[expense.paidById] += expense.amount;
     }
     // Each member gets DEBIT
@@ -133,7 +157,7 @@ export function calcSettlements(members, expenses) {
     const transfer = Math.min(cred[i].amount, debt[j].amount);
     if (transfer > 0.01) {
       settlements.push({
-        id: crypto.randomUUID(),
+        id: createId("settlement"),
         from: debt[j],
         to: cred[i],
         amount: Number(transfer.toFixed(2)),
@@ -152,9 +176,14 @@ export function getMemberSummary(members, expenses) {
   const balances = buildBalances(members, expenses);
 
   return members.map((member) => {
-    const paid = expenses
-      .filter((e) => e.paidById === member.id)
-      .reduce((sum, e) => sum + e.amount, 0);
+    const paid = expenses.reduce((sum, e) => {
+      const contributors = Array.isArray(e.contributors) ? e.contributors : [];
+      if (contributors.length) {
+        const match = contributors.find((c) => c.memberId === member.id);
+        return sum + Number(match?.amount || 0);
+      }
+      return e.paidById === member.id ? sum + e.amount : sum;
+    }, 0);
 
     const owed = expenses.reduce((sum, e) => {
       const shares = calcShares(e);
@@ -172,17 +201,33 @@ export function getMemberSummary(members, expenses) {
 
 export function validateSplit(expense) {
   if (expense.amount <= 0) {
-    return { valid: false, error: 'Amount must be greater than 0.' };
+    return { valid: false, error: "Amount must be greater than 0." };
   }
 
   if (!expense.memberIds || expense.memberIds.length === 0) {
-    return { valid: false, error: 'At least one member must be selected.' };
+    return { valid: false, error: "At least one member must be selected." };
   }
 
-  if (expense.splitType === 'custom') {
+  if (Array.isArray(expense.contributors) && expense.contributors.length) {
+    const sum = expense.contributors.reduce(
+      (s, item) => s + Number(item.amount || 0),
+      0,
+    );
+    if (sum <= 0) {
+      return { valid: false, error: "At least one contributor must pay." };
+    }
+    if (Math.abs(sum - expense.amount) > 0.01) {
+      return {
+        valid: false,
+        error: `Contributions sum (${sum.toFixed(2)}) must equal total (${expense.amount}).`,
+      };
+    }
+  }
+
+  if (expense.splitType === "custom") {
     const sum = expense.memberIds.reduce(
       (s, id) => s + Number(expense.customAmounts[id] || 0),
-      0
+      0,
     );
     if (Math.abs(sum - expense.amount) > 0.01) {
       return {
@@ -192,10 +237,10 @@ export function validateSplit(expense) {
     }
   }
 
-  if (expense.splitType === 'percentage') {
+  if (expense.splitType === "percentage") {
     const sum = expense.memberIds.reduce(
       (s, id) => s + Number(expense.customAmounts[id] || 0),
-      0
+      0,
     );
     if (Math.abs(sum - 100) > 0.01) {
       return {

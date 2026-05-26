@@ -6,5 +6,5 @@ IF NOT EXIST node_modules (
   npm install
 )
 start http://localhost:5173
-npm run dev
+npm run web -- --port 5173
 pause

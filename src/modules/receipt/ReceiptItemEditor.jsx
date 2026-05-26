@@ -1,203 +1,245 @@
-import React, { useState } from 'react';
-import { money } from '../../utils/helpers';
-import { categories } from '../../utils/constants';
-import Button from '../../components/Button';
+import React from "react";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Button from "../../components/Button";
+import { categories } from "../../utils/constants";
+import { money } from "../../utils/helpers";
 
-const categoryIcons = {
-  Food: '🍱',
-  Transport: '🚌',
-  Groceries: '🛒',
-  Utilities: '📱',
-  Education: '📚',
-  Health: '💊',
-  Entertainment: '🎬',
-  Social: '🎁',
-  Income: '💰',
-  Miscellaneous: '📌',
-};
+function itemName(item) {
+  return (
+    String(item.note || "")
+      .split(" x ")[0]
+      .trim() || ""
+  );
+}
 
-function ItemRow({ item, onUpdate, onDelete }) {
-  const [expanded, setExpanded] = useState(false);
-  const isNegative = Number(item.amount) < 0;
-  const name = item.note.split('×')[0].trim();
-  const opt = categories.find((c) => c.category === item.category) || categories[0];
-  const icon = categoryIcons[item.category] || '📌';
+function ReceiptItemEditor({
+  items = [],
+  onUpdate,
+  onDelete,
+  onAddManual,
+  onClearAll,
+}) {
+  const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  if (!items.length) {
+    return (
+      <View style={styles.emptyCard}>
+        <Text style={styles.emptyTitle}>Kono item extract hoyni</Text>
+        <Text style={styles.emptySubtitle}>
+          OCR diye extract koro ba manually item add koro.
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200">
-      <div
-        className="flex cursor-pointer items-center gap-3 p-3 transition hover:bg-slate-100"
-        onClick={() => setExpanded((value) => !value)}
-      >
-        <div className="text-xl">{icon}</div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">{name}</p>
-          <p className="text-xs text-slate-400">
-            {item.category} · {item.subcategory} · qty {item.qty}
-          </p>
-        </div>
-        <div className={`text-sm font-black ${isNegative ? 'text-emerald-500' : ''}`}>
-          {money(item.amount)}
-        </div>
-        <div className="text-xs text-slate-400">{expanded ? '▲' : '▼'}</div>
-      </div>
+    <View style={styles.wrapper}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Extracted Items</Text>
+          <Text style={styles.subtitle}>{items.length} ta item ready</Text>
+        </View>
+        <View style={styles.actionRow}>
+          <Button variant="outline" onPress={onAddManual}>
+            Add item
+          </Button>
+          <Button variant="danger" onPress={onClearAll}>
+            Clear all
+          </Button>
+        </View>
+      </View>
 
-      {expanded ? (
-        <div className="space-y-3 border-t border-slate-200 bg-white p-4">
-          <label className="text-xs text-slate-500">
-            Item name
-            <input
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
-              value={name}
-              onChange={(event) => onUpdate(item.id, 'name', event.target.value)}
-            />
-          </label>
-
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <label className="text-xs text-slate-500">
-              Qty
-              <input
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
-                type="number"
-                min="1"
-                value={item.qty}
-                onChange={(event) => onUpdate(item.id, 'qty', event.target.value)}
+      <View style={styles.list}>
+        {items.map((item) => {
+          const option =
+            categories.find((cat) => cat.category === item.category) ||
+            categories[0];
+          return (
+            <View key={item.id} style={styles.itemCard}>
+              <TextInput
+                value={itemName(item)}
+                onChangeText={(value) => onUpdate(item.id, "name", value)}
+                style={styles.input}
+                placeholder="Item name"
               />
-            </label>
-            <label className="text-xs text-slate-500">
-              Category
-              <select
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
-                value={item.category}
-                onChange={(event) => onUpdate(item.id, 'category', event.target.value)}
+              <TextInput
+                value={item.merchant || ""}
+                onChangeText={(value) => onUpdate(item.id, "merchant", value)}
+                style={styles.input}
+                placeholder="Merchant (optional)"
+              />
+              <View style={styles.row}>
+                <TextInput
+                  value={item.qty === "" ? "" : String(item.qty ?? "")}
+                  onChangeText={(value) => onUpdate(item.id, "qty", value)}
+                  style={[styles.input, styles.smallInput]}
+                  keyboardType="numeric"
+                  placeholder="Qty"
+                />
+                <TextInput
+                  value={item.amount === "" ? "" : String(item.amount ?? "")}
+                  onChangeText={(value) => onUpdate(item.id, "amount", value)}
+                  style={[styles.input, styles.smallInput]}
+                  keyboardType="numeric"
+                  placeholder="Amount"
+                />
+              </View>
+
+              <Text style={styles.label}>Category</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chipRow}
               >
                 {categories.map((cat) => (
-                  <option key={cat.category}>{cat.category}</option>
+                  <Button
+                    key={cat.category}
+                    variant={
+                      cat.category === item.category ? "primary" : "outline"
+                    }
+                    onPress={() => onUpdate(item.id, "category", cat.category)}
+                  >
+                    {cat.category}
+                  </Button>
                 ))}
-              </select>
-            </label>
-            <label className="text-xs text-slate-500">
-              Subcategory
-              <select
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
-                value={item.subcategory}
-                onChange={(event) => onUpdate(item.id, 'subcategory', event.target.value)}
+              </ScrollView>
+
+              <Text style={styles.label}>Subcategory</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chipRow}
               >
-                {opt.subcategories.map((sub) => (
-                  <option key={sub}>{sub}</option>
+                {option.subcategories.map((sub) => (
+                  <Button
+                    key={sub}
+                    variant={sub === item.subcategory ? "primary" : "outline"}
+                    onPress={() => onUpdate(item.id, "subcategory", sub)}
+                  >
+                    {sub}
+                  </Button>
                 ))}
-              </select>
-            </label>
-            <label className="text-xs text-slate-500">
-              Amount
-              <input
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold outline-none focus:border-slate-950"
-                type="number"
-                value={item.amount}
-                onChange={(event) => onUpdate(item.id, 'amount', event.target.value)}
-              />
-            </label>
-          </div>
+              </ScrollView>
 
-          <label className="text-xs text-slate-500">
-            Merchant (optional)
-            <input
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-950"
-              placeholder="e.g. Shwapno, Meena Bazar"
-              value={item.merchant || ''}
-              onChange={(event) => onUpdate(item.id, 'merchant', event.target.value)}
-            />
-          </label>
+              <View style={styles.footerRow}>
+                <Text style={styles.amount}>{money(item.amount)}</Text>
+                <Button variant="danger" onPress={() => onDelete(item.id)}>
+                  Remove
+                </Button>
+              </View>
+            </View>
+          );
+        })}
+      </View>
 
-          <div className="flex justify-end">
-            <Button variant="danger" onClick={() => onDelete(item.id)}>
-              🗑️ Remove item
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
+      <View style={styles.totalCard}>
+        <Text style={styles.totalLabel}>Total</Text>
+        <Text style={styles.totalValue}>{money(total)}</Text>
+      </View>
+    </View>
   );
 }
 
-function EmptyItems() {
-  return (
-    <div className="py-10 text-center">
-      <div className="text-5xl">📋</div>
-      <p className="mt-2 font-bold text-slate-700">Kono item extract hoyni</p>
-      <p className="text-sm text-slate-400">OCR diye extract koro ba manually item add koro.</p>
-    </div>
-  );
-}
-
-function SummaryFooter({ items }) {
-  const subtotal = items.filter((item) => Number(item.amount) > 0).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const discounts = items.filter((item) => Number(item.amount) < 0).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const total = subtotal + discounts;
-
-  return (
-    <div className="space-y-2 rounded-2xl bg-slate-950 p-4 text-white">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-slate-400">Subtotal</span>
-        <span className="font-bold">{money(subtotal)}</span>
-      </div>
-      {discounts < 0 ? (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-emerald-400">Discount</span>
-          <span className="font-bold text-emerald-400">{money(discounts)}</span>
-        </div>
-      ) : null}
-      <div className="flex items-center justify-between border-t border-white/10 pt-2 text-sm font-black">
-        <span>Total</span>
-        <span>{money(total)}</span>
-      </div>
-    </div>
-  );
-}
-
-function Toolbar({ itemCount, onAddManual, onClearAll, onExpandAll }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p className="text-lg font-black">Extracted Items</p>
-        <p className="text-xs text-slate-500">{itemCount} ta item · Edit kore add koro</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={onExpandAll}>
-          Expand all
-        </Button>
-        <Button variant="outline" onClick={onAddManual}>
-          + Add item
-        </Button>
-        <Button variant="danger" onClick={onClearAll}>
-          Clear all
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ReceiptItemEditor({ items, onUpdate, onDelete, onAddManual, onClearAll }) {
-  const [allExpanded, setAllExpanded] = useState(false);
-
-  if (items.length === 0) return <EmptyItems />;
-
-  return (
-    <div className="space-y-4">
-      <Toolbar
-        itemCount={items.length}
-        onAddManual={onAddManual}
-        onClearAll={onClearAll}
-        onExpandAll={() => setAllExpanded((value) => !value)}
-      />
-      <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
-        {items.map((item) => (
-          <ItemRow key={item.id} item={item} onUpdate={onUpdate} onDelete={onDelete} expandAll={allExpanded} />
-        ))}
-      </div>
-      <SummaryFooter items={items} />
-    </div>
-  );
-}
+const styles = StyleSheet.create({
+  wrapper: {
+    gap: 12,
+  },
+  header: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  subtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748b",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  list: {
+    gap: 12,
+  },
+  itemCard: {
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    gap: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+  smallInput: {
+    flex: 1,
+  },
+  row: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  chipRow: {
+    flexGrow: 0,
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+  amount: {
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  totalCard: {
+    backgroundColor: "#0f172a",
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  totalLabel: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  totalValue: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
+  emptyCard: {
+    backgroundColor: "#f8fafc",
+    padding: 24,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    fontWeight: "800",
+    color: "#1e293b",
+  },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+  },
+});
 
 export default ReceiptItemEditor;

@@ -1,32 +1,85 @@
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity } from "react-native";
+
+const variants = {
+  primary: {
+    backgroundColor: "#0f172a",
+    borderColor: "#0f172a",
+    color: "#ffffff",
+  },
+  outline: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    color: "#0f172a",
+  },
+  danger: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#fecaca",
+    color: "#b91c1c",
+  },
+  success: {
+    backgroundColor: "#059669",
+    borderColor: "#059669",
+    color: "#ffffff",
+  },
+  warning: {
+    backgroundColor: "#f59e0b",
+    borderColor: "#f59e0b",
+    color: "#0f172a",
+  },
+};
+
 function Button({
   children,
-  onClick,
+  onPress,
   disabled = false,
   variant = "primary",
-  className = "",
-  type = "button",
+  style,
 }) {
-  const base =
-    "inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed";
-  const variants = {
-    primary: "bg-slate-950 text-white hover:bg-slate-800",
-    outline:
-      "border border-slate-300 bg-white text-slate-950 hover:bg-slate-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100",
-    success: "bg-emerald-500 text-white hover:bg-emerald-600",
-    warning: "bg-amber-400 text-slate-950 hover:bg-amber-500",
-  };
-
+  const theme = variants[variant] || variants.primary;
+  const content =
+    typeof children === "string" || typeof children === "number" ? (
+      <Text style={[styles.text, { color: theme.color }]}>{children}</Text>
+    ) : (
+      children
+    );
   return (
-    <button
-      type={type}
+    <TouchableOpacity
+      accessibilityRole="button"
       disabled={disabled}
-      onClick={onClick}
-      className={`${base} ${variants[variant]} ${className}`}
+      onPress={onPress}
+      style={[
+        styles.button,
+        {
+          backgroundColor: theme.backgroundColor,
+          borderColor: theme.borderColor,
+        },
+        disabled && styles.disabled,
+        style,
+      ]}
     >
-      {children}
-    </button>
+      {content}
+    </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  button: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  text: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  disabled: {
+    opacity: 0.55,
+  },
+});
 
 export default Button;
