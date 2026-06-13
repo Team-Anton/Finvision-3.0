@@ -35,11 +35,16 @@ function StatCell({ label, value, sub, color = "slate" }) {
 function StatsGrid({ monthlyBudget, totalSpent, remaining, expenses = [] }) {
   const dailyAvg = calcDailyAvg(totalSpent, DAYS_PASSED);
   const healthScore = calcHealthScore(remaining, monthlyBudget);
-  const spentPct = Math.round((totalSpent / Math.max(monthlyBudget, 1)) * 100);
+  const safeBudget = Math.max(Number(monthlyBudget) || 0, 0);
+  const safeSpent = Math.max(Number(totalSpent) || 0, 0);
+  const spentPct = Math.max(
+    0,
+    Math.min(999, Math.round((safeSpent / Math.max(safeBudget, 1)) * 100)),
+  );
   const daysLeft = dailyAvg
-    ? Math.floor(remaining / dailyAvg)
-    : DAYS_IN_MONTH - DAYS_PASSED;
-  const biggestExpense = expenses.reduce(
+    ? Math.max(0, Math.floor(remaining / dailyAvg))
+    : Math.max(0, DAYS_IN_MONTH - DAYS_PASSED);
+  const biggestExpense = (Array.isArray(expenses) ? expenses : []).reduce(
     (max, item) =>
       Number(item.amount || 0) > Number(max.amount || 0) ? item : max,
     { amount: 0, category: "-", note: "-" },

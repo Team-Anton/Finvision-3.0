@@ -36,7 +36,13 @@ export function MemberAvatar({ member, size = "md", showName = false }) {
   );
 }
 
-function MemberList({ members = [], expenses = [], onAdd, onDelete }) {
+function MemberList({
+  members = [],
+  expenses = [],
+  message = "",
+  onAdd,
+  onDelete,
+}) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
 
@@ -44,6 +50,13 @@ function MemberList({ members = [], expenses = [], onAdd, onDelete }) {
     const trimmed = name.trim();
     if (!trimmed) {
       setError("Name likhte hobe.");
+      return;
+    }
+    const duplicate = members.some(
+      (member) => member.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (duplicate) {
+      setError("Ei name already added ache.");
       return;
     }
     onAdd(createMember(trimmed, members.length));
@@ -79,11 +92,10 @@ function MemberList({ members = [], expenses = [], onAdd, onDelete }) {
           placeholder="Member er naam likho..."
           style={styles.input}
         />
-        <Button onPress={handleAdd} disabled={!name.trim()}>
-          Add
-        </Button>
+        <Button onPress={handleAdd}>Add</Button>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {message ? <Text style={styles.error}>{message}</Text> : null}
 
       <View style={styles.list}>
         {!members.length ? (

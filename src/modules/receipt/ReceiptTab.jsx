@@ -68,6 +68,12 @@ function ReceiptTab() {
     (sum, item) => sum + Number(item.amount || 0),
     0,
   );
+  const itemsReady =
+    receipt.items.length > 0 &&
+    receipt.items.every((item) => {
+      const amount = Number(item.amount);
+      return Number.isFinite(amount) && amount !== 0;
+    });
 
   function update(patch) {
     setReceipt((current) => ({ ...current, ...patch }));
@@ -119,13 +125,6 @@ function ReceiptTab() {
       return;
     }
 
-    if (!receipt.file.base64) {
-      update({
-        status: "Image base64 data nai. Please re-pick the image.",
-      });
-      return;
-    }
-
     try {
       update({ scanning: true, progress: 0, status: "OCR cholche..." });
       const result = await runOcr(receipt.file, (progress) =>
@@ -153,9 +152,17 @@ function ReceiptTab() {
       update({
         scanning: false,
         progress: 0,
-        status: `OCR failed: ${error.message || "Please try again."}`,
+        status: error.message || "OCR failed. Please add items manually.",
       });
     }
+  }
+
+  function handleAddManualItem() {
+    update({
+      items: [...receipt.items, createManualItem()],
+      totalVerified: true,
+      status: "Manual item added. Edit it, then add it to your budget.",
+    });
   }
 
   function handleUpdateItem(id, field, value) {
@@ -195,7 +202,10 @@ function ReceiptTab() {
   }
 
   function handleAddToBudget() {
-    if (!receipt.items.length) return;
+    if (!itemsReady) {
+      update({ status: "Add a valid non-zero amount for every item first." });
+      return;
+    }
     
     dispatch(addMultipleExpenses(receipt.items));
     
@@ -308,13 +318,11 @@ function ReceiptTab() {
           scanning={receipt.scanning}
           progress={receipt.progress}
           hasFile={!!receipt.file}
-          hasItems={receipt.items.length > 0}
+          hasItems={itemsReady}
           totalVerified={receipt.totalVerified}
           onPickImage={handlePickImage}
           onExtract={handleExtract}
-          onAddManual={() =>
-            update({ items: [...receipt.items, createManualItem()] })
-          }
+          onAddManual={handleAddManualItem}
           onAddToBudget={handleAddToBudget}
           onRemoveImage={() => update(initialReceiptState)}
         />
@@ -343,13 +351,11 @@ function ReceiptTab() {
           onDelete={(id) =>
             update({ items: receipt.items.filter((item) => item.id !== id) })
           }
-          onAddManual={() =>
-            update({ items: [...receipt.items, createManualItem()] })
-          }
+          onAddManual={handleAddManualItem}
           onClearAll={() => update({ items: [], status: "Items cleared.", totalVerified: false })}
         />
 
-        {receipt.items.length && receipt.totalVerified ? (
+        {itemsReady && receipt.totalVerified ? (
           <View style={styles.totalRow}>
             <View>
               <Text style={styles.totalLabel}>

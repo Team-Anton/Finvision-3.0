@@ -5,16 +5,16 @@ import Card from "../../components/Card";
 import { money } from "../../utils/helpers";
 import { MemberAvatar } from "./MemberList";
 import {
-  calcSettlements,
+  calcGroupSettlements,
   getGroupStats,
   getMemberSummary,
   WALLET_ID,
 } from "./SplitEngine";
 
 function SettlementSummary({ members = [], expenses = [] }) {
-  const settlements = calcSettlements(members, expenses);
-  const memberSummaries = getMemberSummary(members, expenses);
   const displayMembers = members.filter((member) => member.id !== WALLET_ID);
+  const settlements = calcGroupSettlements(displayMembers, expenses);
+  const memberSummaries = getMemberSummary(displayMembers, expenses);
   const stats = getGroupStats(displayMembers, expenses);
 
   async function sharePlan() {
@@ -38,9 +38,9 @@ function SettlementSummary({ members = [], expenses = [] }) {
     <Card>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Settlement Plan</Text>
+          <Text style={styles.title}>Who pays who?</Text>
           <Text style={styles.subtitle}>
-            Minimum transactions e settle korar plan.
+            Direct person-to-person expenses only.
           </Text>
         </View>
         <Button
@@ -52,7 +52,7 @@ function SettlementSummary({ members = [], expenses = [] }) {
         </Button>
       </View>
 
-      {expenses.length ? (
+      {stats.expenseCount ? (
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Total</Text>
@@ -75,18 +75,18 @@ function SettlementSummary({ members = [], expenses = [] }) {
         </View>
       ) : null}
 
-      {!expenses.length ? (
+      {!stats.expenseCount ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Kono expense nei</Text>
+          <Text style={styles.emptyTitle}>No direct expenses yet</Text>
           <Text style={styles.emptySubtitle}>
-            Expense add korle settlement plan dekhabe.
+            Add a person-paid expense to see the settlement plan.
           </Text>
         </View>
       ) : !settlements.length ? (
         <View style={styles.successCard}>
-          <Text style={styles.successTitle}>Sob settle hoyeche!</Text>
+          <Text style={styles.successTitle}>All settled</Text>
           <Text style={styles.successSubtitle}>
-            Group er keu karo kache theke taka pabe na.
+            No one needs to pay anyone back for direct expenses.
           </Text>
         </View>
       ) : (
@@ -108,9 +108,9 @@ function SettlementSummary({ members = [], expenses = [] }) {
         </View>
       )}
 
-      {members.length && expenses.length ? (
+      {members.length && stats.expenseCount ? (
         <View style={styles.balanceSection}>
-          <Text style={styles.balanceTitle}>Individual balances</Text>
+          <Text style={styles.balanceTitle}>Direct balance breakdown</Text>
           <View style={styles.balanceList}>
             {memberSummaries.map((summary) => (
               <View key={summary.id} style={styles.balanceRow}>
@@ -119,21 +119,22 @@ function SettlementSummary({ members = [], expenses = [] }) {
                   <Text
                     style={[
                       styles.balanceValue,
-                      summary.balance > 0
+                      summary.directBalance > 0
                         ? styles.balancePositive
-                        : summary.balance < 0
+                        : summary.directBalance < 0
                           ? styles.balanceNegative
                           : styles.balanceNeutral,
                     ]}
                   >
-                    {summary.balance > 0
-                      ? `+${money(summary.balance)}`
-                      : summary.balance < 0
-                        ? money(summary.balance)
+                    {summary.directBalance > 0
+                      ? `+${money(summary.directBalance)}`
+                      : summary.directBalance < 0
+                        ? money(summary.directBalance)
                         : "Settled"}
                   </Text>
                   <Text style={styles.balanceMeta}>
-                    Paid {money(summary.paid)} - Owes {money(summary.owed)}
+                    Direct paid {money(summary.directPaid)} - Direct share{" "}
+                    {money(summary.directShare)}
                   </Text>
                 </View>
               </View>

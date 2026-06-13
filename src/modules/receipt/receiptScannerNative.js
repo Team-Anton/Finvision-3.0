@@ -1,25 +1,6 @@
-import { ImageManipulator } from "expo-image-manipulator";
 import { detectCategory, parseReceiptNumber } from "../../utils/helpers";
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-async function enhanceReceiptImageNative(asset) {
-  try {
-    if (!asset?.uri) {
-      throw new Error("No image URI found.");
-    }
-
-    const manipResult = await ImageManipulator.manipulateAsync(asset.uri, [], {
-      compress: 0.95,
-      format: "jpeg",
-    });
-
-    return manipResult.uri;
-  } catch (error) {
-    console.warn("Image enhancement failed, using original:", error.message);
-    return asset.uri;
-  }
-}
 
 function isKnownRetail404(rawText) {
   const lower = String(rawText || "").toLowerCase();
@@ -611,7 +592,7 @@ export function parseReceiptText(rawText, todayLabel) {
 
 export async function runOcr(asset, onProgress) {
   throw new Error(
-    "OCR via native requires react-native-tesseract-ocr or MLKit. For now, use the web app or implement a native module. Image preprocessing is prepared for when native OCR is added.",
+    "Automatic OCR is unavailable on this device. Please add items manually.",
   );
 }
 

@@ -4,36 +4,20 @@ import Button from "../../components/Button";
 import Card from "../../components/Card";
 import { money } from "../../utils/helpers";
 import { MemberAvatar } from "./MemberList";
-import { buildBalances, WALLET_ID } from "./SplitEngine";
+import { getSharedFundSummary } from "./SplitEngine";
 
-function WalletPanel({ members = [], walletMember, expenses = [], onDeposit }) {
+function WalletPanel({ members = [], expenses = [], onDeposit }) {
   const [amount, setAmount] = useState("");
   const [selectedMember, setSelectedMember] = useState("");
   const [error, setError] = useState("");
 
-  const walletBalance = useMemo(() => {
-    const balances = buildBalances([...members, walletMember], expenses);
-    return balances[WALLET_ID] || 0;
-  }, [members, walletMember, expenses]);
-
-  const { totalDeposits, totalSpent } = useMemo(() => {
-    const deposits = expenses.filter(
-      (expense) =>
-        (expense.memberIds || []).includes(WALLET_ID) &&
-        !(expense.contributors || []).some(
-          (contributor) => contributor.memberId === WALLET_ID,
-        ),
-    );
-    const spent = expenses.filter((expense) =>
-      (expense.contributors || []).some(
-        (contributor) => contributor.memberId === WALLET_ID,
-      ),
-    );
-    return {
-      totalDeposits: deposits.reduce((sum, item) => sum + item.amount, 0),
-      totalSpent: spent.reduce((sum, item) => sum + item.amount, 0),
-    };
-  }, [expenses]);
+  const fundSummary = useMemo(
+    () => getSharedFundSummary(members, expenses),
+    [expenses, members],
+  );
+  const walletBalance = fundSummary.balance;
+  const totalDeposits = fundSummary.deposits;
+  const totalSpent = fundSummary.spend;
 
   function handleDeposit() {
     const numericAmount = Number(amount);
@@ -54,13 +38,13 @@ function WalletPanel({ members = [], walletMember, expenses = [], onDeposit }) {
     <Card>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Group Wallet</Text>
+          <Text style={styles.title}>Shared Fund</Text>
           <Text style={styles.subtitle}>
-            Wallet e deposit kore shared spend track koro.
+            Use Shared Fund when your group collects money first.
           </Text>
         </View>
         <View style={styles.balanceBox}>
-          <Text style={styles.balanceLabel}>Wallet balance</Text>
+          <Text style={styles.balanceLabel}>Fund balance</Text>
           <Text
             style={[
               styles.balanceValue,
@@ -80,7 +64,7 @@ function WalletPanel({ members = [], walletMember, expenses = [], onDeposit }) {
           <Text style={styles.statValue}>{money(totalDeposits)}</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Wallet spend</Text>
+          <Text style={styles.statLabel}>Fund spend</Text>
           <Text style={styles.statValue}>{money(totalSpent)}</Text>
         </View>
       </View>

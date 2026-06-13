@@ -1,8 +1,31 @@
 # Dependencies
 node_modules/
 
-# Build output
+# Expo / React Native generated cache
+.expo/
+.expo-shared/
+
+# Temporary Expo/Codex verification exports
+.expo-check*/
+.expo-check-*/
+.codex-check*/
+.codex-temp*/
+.check-output*/
+.test-output*/
+dist-native-test/
+
+# Web/export/build outputs
 dist/
+web-build/
+.expo-export/
+exported-app/
+
+# Temporary/cache files
+tmp/
+temp/
+.cache/
+coverage/
+*.log
 
 # Vite cache
 .vite/
@@ -20,3 +43,5 @@ Thumbs.db
 # Env files
 .env
 .env.*
+!.env.example
+!backend/.env.example

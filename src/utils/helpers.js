@@ -3,13 +3,20 @@ export const todayLabel = new Date().toLocaleDateString("en-GB", {
   month: "short",
 });
 
+function finiteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 export function createId(prefix = "id") {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export function money(n) {
-  return `${Number(n || 0).toLocaleString(undefined, {
+  const amount = finiteNumber(n);
+  const normalized = Math.abs(amount) < 0.005 ? 0 : amount;
+  return `${normalized.toLocaleString(undefined, {
     maximumFractionDigits: 2,
   })} BDT`;
 }
@@ -99,20 +106,23 @@ export function detectCategory(text) {
 }
 
 export function calcTotalSpent(expenses = []) {
-  return expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  if (!Array.isArray(expenses)) return 0;
+  return expenses.reduce((sum, item) => sum + finiteNumber(item?.amount), 0);
 }
 
 export function calcRemaining(monthlyBudget, totalSpent) {
-  return Math.max(Number(monthlyBudget || 0) - Number(totalSpent || 0), 0);
+  return Math.max(finiteNumber(monthlyBudget) - finiteNumber(totalSpent), 0);
 }
 
 export function calcHealthScore(remaining, monthlyBudget) {
+  const safeRemaining = Math.max(finiteNumber(remaining), 0);
+  const safeBudget = Math.max(finiteNumber(monthlyBudget), 0);
   return Math.max(
     0,
     Math.min(
       100,
       Math.round(
-        (Number(remaining || 0) / Math.max(Number(monthlyBudget || 0), 1)) *
+        (safeRemaining / Math.max(safeBudget, 1)) *
           90 +
           10,
       ),
@@ -121,7 +131,8 @@ export function calcHealthScore(remaining, monthlyBudget) {
 }
 
 export function calcDailyAvg(totalSpent, daysPassed = 12) {
-  return daysPassed ? Number(totalSpent || 0) / daysPassed : 0;
+  const safeDays = finiteNumber(daysPassed);
+  return safeDays > 0 ? finiteNumber(totalSpent) / safeDays : 0;
 }
 
 export function calcBudgetStatus(monthlyBudget, totalSpent, date = new Date()) {
@@ -131,11 +142,13 @@ export function calcBudgetStatus(monthlyBudget, totalSpent, date = new Date()) {
     0,
   ).getDate();
   const dayOfMonth = Math.max(1, date.getDate());
+  const safeBudget = Math.max(finiteNumber(monthlyBudget), 0);
+  const safeSpent = Math.max(finiteNumber(totalSpent), 0);
   const projectedSpend = dayOfMonth
-    ? (Number(totalSpent || 0) / dayOfMonth) * daysInMonth
+    ? (safeSpent / dayOfMonth) * daysInMonth
     : 0;
-  const safeLimit = Number(monthlyBudget || 0) * 1.05;
-  const warningLimit = Number(monthlyBudget || 0) * 1.2;
+  const safeLimit = safeBudget * 1.05;
+  const warningLimit = safeBudget * 1.2;
 
   if (projectedSpend <= safeLimit) {
     return { status: "Safe", projectedSpend };

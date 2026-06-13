@@ -19,9 +19,10 @@ const COLORS = [
 
 function buildPieData(expenses = []) {
   const totals = expenses
-    .filter((item) => Number(item.amount || 0) > 0)
+    .filter((item) => Number(item?.amount || 0) > 0)
     .reduce((map, item) => {
-      map[item.category] = (map[item.category] || 0) + Number(item.amount || 0);
+      const category = item.category || "Miscellaneous";
+      map[category] = (map[category] || 0) + Number(item.amount || 0);
       return map;
     }, {});
 
@@ -37,7 +38,7 @@ function buildPieData(expenses = []) {
 function CategoryPieChart({ expenses = [] }) {
   const data = useMemo(() => buildPieData(expenses), [expenses]);
   const total = data.reduce((sum, item) => sum + item.value, 0);
-  const chartWidth = Dimensions.get("window").width - 64;
+  const chartWidth = Math.max(280, Dimensions.get("window").width - 64);
 
   return (
     <Card>

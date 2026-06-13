@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -88,10 +89,11 @@ function AssistantTab() {
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.heroWrapper}>
-        <img
-          src="/cover-finvision.png"
-          alt="FinVision AI - Smart Finance for Students"
+        <Image
+          source={require("../../assets/cover-finvision.png")}
           style={styles.heroImage}
+          resizeMode="cover"
+          accessibilityLabel="FinVision AI - Smart Finance for Students"
         />
       </View>
       <Card>
@@ -186,8 +188,7 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: "100%",
-    height: "auto",
-    display: "block",
+    height: 190,
   },
   sectionTitle: {
     fontSize: 18,

@@ -6,9 +6,13 @@ import Card from "../../components/Card";
 import { money } from "../../utils/helpers";
 
 function buildDailyData(expenses = [], monthlyBudget = 0) {
-  const dayMap = expenses.reduce((map, item) => {
-    const date = item.date || "Unknown";
-    const amount = Number(item.amount || 0);
+  const safeBudget = Number.isFinite(Number(monthlyBudget))
+    ? Math.max(Number(monthlyBudget), 0)
+    : 0;
+  const dayMap = (Array.isArray(expenses) ? expenses : []).reduce((map, item) => {
+    const date = item?.date || "Unknown";
+    const amount = Number(item?.amount || 0);
+    if (!Number.isFinite(amount)) return map;
     if (!map[date]) map[date] = { date, spent: 0, income: 0 };
     if (amount > 0) map[date].spent += amount;
     if (amount < 0) map[date].income += Math.abs(amount);
@@ -21,7 +25,7 @@ function buildDailyData(expenses = [], monthlyBudget = 0) {
       ...item,
       spent: Math.round(item.spent),
       cumulative: Math.round(cumulative),
-      dailyBudget: Math.round(monthlyBudget / 30),
+      dailyBudget: Math.round(safeBudget / 30),
     };
   });
 }
@@ -41,9 +45,14 @@ function SpendingChart({ expenses = [], monthlyBudget = 0 }) {
     () => buildDailyData(expenses, monthlyBudget),
     [expenses, monthlyBudget],
   );
-  const dailyBudget = Math.round(monthlyBudget / 30);
-  const chartWidth = Dimensions.get("window").width - 64;
-  const displayData = data.slice(-7);
+  const safeBudget = Number.isFinite(Number(monthlyBudget))
+    ? Math.max(Number(monthlyBudget), 0)
+    : 0;
+  const dailyBudget = Math.round(safeBudget / 30);
+  const chartWidth = Math.max(280, Dimensions.get("window").width - 64);
+  const displayData = data
+    .filter((item) => item.spent > 0 || item.cumulative > 0)
+    .slice(-7);
 
   const chartConfig = {
     backgroundGradientFrom: "#ffffff",
@@ -85,7 +94,7 @@ function SpendingChart({ expenses = [], monthlyBudget = 0 }) {
         </View>
       </View>
 
-      {!data.length ? (
+      {!displayData.length ? (
         <EmptyChart />
       ) : chartType === "bar" ? (
         <BarChart

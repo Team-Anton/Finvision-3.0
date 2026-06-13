@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
@@ -11,7 +11,6 @@ function ExpenseSplitter({
   expenses = [],
   onAdd,
   onDelete,
-  walletMember,
 }) {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -21,8 +20,27 @@ function ExpenseSplitter({
   const [customAmounts, setCustomAmounts] = useState({});
   const [error, setError] = useState("");
 
-  const selectedIds = memberIds.length ? memberIds : members.map((m) => m.id);
-  const contributorList = walletMember ? [walletMember, ...members] : members;
+  useEffect(() => {
+    setMemberIds((current) => {
+      const memberIdSet = new Set(members.map((member) => member.id));
+      const kept = current.filter((id) => memberIdSet.has(id));
+      const missing = members
+        .map((member) => member.id)
+        .filter((id) => !kept.includes(id));
+      return kept.length
+        ? [...kept, ...missing]
+        : members.map((member) => member.id);
+    });
+    setContributors((current) => {
+      const validIds = new Set(members.map((member) => member.id));
+      return Object.fromEntries(
+        Object.entries(current).filter(([id]) => validIds.has(id)),
+      );
+    });
+  }, [members]);
+
+  const selectedIds = memberIds;
+  const contributorList = members;
   const contributorIds = Object.keys(contributors).filter(
     (id) => Number(contributors[id] || 0) > 0,
   );
@@ -38,16 +56,22 @@ function ExpenseSplitter({
   const shares = calcShares(previewExpense);
 
   function toggleMember(id) {
-    const base = selectedIds;
     setMemberIds(
-      base.includes(id) ? base.filter((item) => item !== id) : [...base, id],
+      selectedIds.includes(id)
+        ? selectedIds.filter((item) => item !== id)
+        : [...selectedIds, id],
     );
   }
 
   function handleAdd() {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setError("Amount must be greater than 0.");
+      return;
+    }
     const expense = createSplitExpense({
       title,
-      amount: Number(amount),
+      amount: numericAmount,
       contributors: contributorIds.map((id) => ({
         memberId: id,
         amount: Number(contributors[id] || 0),
@@ -66,6 +90,7 @@ function ExpenseSplitter({
     setAmount("");
     setContributors({});
     setCustomAmounts({});
+    setMemberIds(members.map((member) => member.id));
     setError("");
   }
 
@@ -92,13 +117,19 @@ function ExpenseSplitter({
       <View style={styles.form}>
         <TextInput
           value={title}
-          onChangeText={setTitle}
+          onChangeText={(value) => {
+            setTitle(value);
+            setError("");
+          }}
           placeholder="Lunch, Rickshaw, Hotel"
           style={styles.input}
         />
         <TextInput
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={(value) => {
+            setAmount(value);
+            setError("");
+          }}
           placeholder="Amount"
           style={styles.input}
           keyboardType="numeric"
@@ -118,12 +149,13 @@ function ExpenseSplitter({
                     ? ""
                     : String(contributors[member.id])
                 }
-                onChangeText={(value) =>
+                onChangeText={(value) => {
                   setContributors((current) => ({
                     ...current,
                     [member.id]: value,
-                  }))
-                }
+                  }));
+                  setError("");
+                }}
                 style={styles.contributorInput}
                 keyboardType="numeric"
                 placeholder="BDT"
@@ -140,6 +172,7 @@ function ExpenseSplitter({
                 next[member.id] = perPerson ? Number(perPerson.toFixed(2)) : "";
               });
               setContributors(next);
+              setError("");
             }}
           >
             Split contribution equally
@@ -155,6 +188,7 @@ function ExpenseSplitter({
               onPress={() => {
                 setSplitType(type);
                 setCustomAmounts({});
+                setError("");
               }}
             >
               {type}
@@ -199,12 +233,13 @@ function ExpenseSplitter({
                   <Text style={styles.customLabel}>{member.name}</Text>
                   <TextInput
                     value={String(customAmounts[member.id] || "")}
-                    onChangeText={(value) =>
+                    onChangeText={(value) => {
                       setCustomAmounts({
                         ...customAmounts,
                         [member.id]: value,
-                      })
-                    }
+                      });
+                      setError("");
+                    }}
                     style={styles.input}
                     keyboardType="numeric"
                     placeholder={splitType === "percentage" ? "%" : "BDT"}

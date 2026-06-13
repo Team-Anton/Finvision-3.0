@@ -34,18 +34,27 @@ const defaultExpenses = [
 ]
 
 export const loadFromStorage = createAsyncThunk('budget/loadFromStorage', async () => {
-  const raw = await AsyncStorage.getItem(STORAGE_KEY)
-  return raw ? JSON.parse(raw) : null
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (error) {
+    console.warn('Could not load local finance data:', error.message)
+    return null
+  }
 })
 
-export const saveToStorage = (state) => {
-  AsyncStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      monthlyBudget: state.budget.monthlyBudget,
-      expenses: state.budget.expenses,
-    }),
-  )
+export const saveToStorage = async (state) => {
+  try {
+    await AsyncStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        monthlyBudget: state.budget.monthlyBudget,
+        expenses: state.budget.expenses,
+      }),
+    )
+  } catch (error) {
+    console.warn('Could not save local finance data:', error.message)
+  }
 }
 
 const budgetSlice = createSlice({
@@ -53,6 +62,7 @@ const budgetSlice = createSlice({
   initialState: {
     monthlyBudget: 10000,
     expenses: defaultExpenses,
+    hydrated: false,
   },
   reducers: {
     setBudget(state, action) {
@@ -78,11 +88,21 @@ const budgetSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(loadFromStorage.fulfilled, (state, action) => {
-      if (!action.payload) return
-      state.monthlyBudget = action.payload.monthlyBudget ?? state.monthlyBudget
-      state.expenses = Array.isArray(action.payload.expenses)
-        ? action.payload.expenses
-        : state.expenses
+      if (action.payload) {
+        const savedBudget = Number(action.payload.monthlyBudget)
+        state.monthlyBudget = Number.isFinite(savedBudget)
+          ? Math.max(savedBudget, 0)
+          : state.monthlyBudget
+        state.expenses = Array.isArray(action.payload.expenses)
+          ? action.payload.expenses.filter(
+              (expense) => expense && typeof expense === 'object',
+            )
+          : state.expenses
+      }
+      state.hydrated = true
+    })
+    builder.addCase(loadFromStorage.rejected, (state) => {
+      state.hydrated = true
     })
   },
 })

@@ -1,26 +1,26 @@
 {
-    "expo": {
-        "name": "FinVision AI",
-        "slug": "finvision-ai",
-        "version": "3.0.0",
-        "orientation": "portrait",
-        "icon": "./assets/icon.png",
-        "userInterfaceStyle": "light",
-        "splash": {
-            "backgroundColor": "#0f172a"
-        },
-        "ios": {
-            "supportsTablet": false,
-            "bundleIdentifier": "com.finvision.ai"
-        },
-        "android": {
-            "adaptiveIcon": {
-                "backgroundColor": "#0f172a"
-            },
-            "package": "com.finvision.ai"
-        },
-        "plugins": [
-            "expo-image-picker"
-        ]
-    }
+  "expo": {
+    "name": "FinVision AI",
+    "slug": "finvision-ai",
+    "version": "3.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.finvision.ai"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.finvision.ai"
+    },
+    "plugins": [
+      "expo-image-picker",
+      "expo-font"
+    ]
+  }
 }
